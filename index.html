@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SVG 5DOF</title>
+    <link rel="stylesheet" href="css/spectrum.css">
+    <link rel="stylesheet" href="css/panel.css">
+</head>
+<body class="spectrum spectrum--darkest">
+
+    <div class="panel-container">
+
+        <!-- Joint-type button grid: 3 + 3 layout -->
+        <div class="joint-grid">
+            <div class="joint-row">
+                <button id="joint-straight" class="joint-btn" title="Straight cut (original)" data-joint="straight">
+                    <svg class="joint-icon" viewBox="0 0 48 28" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="4">
+                        <polyline points="2 2 46 2 46 26 2 26"/>
+                    </svg>
+                    <span class="joint-label">Straight</span>
+                </button>
+                <button id="joint-slant" class="joint-btn" title="Slant joint" data-joint="slant">
+                    <svg class="joint-icon" viewBox="-1 -1 52 30" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="4">
+                        <polyline points="1.93 2 23.78 2 47.89 26.11 2.47 26.11"/>
+                    </svg>
+                    <span class="joint-label">Slant</span>
+                </button>
+                <button id="joint-bevel" class="joint-btn" title="Bevel joint" data-joint="bevel">
+                    <svg class="joint-icon" viewBox="68 -1 41 30" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="4">
+                        <polyline points="71.4 2.18 93.07 2.18 105.83 14.94 105.83 25.78 71.88 25.78"/>
+                    </svg>
+                    <span class="joint-label">Bevel</span>
+                </button>
+            </div>
+            <div class="joint-row">
+                <button id="joint-slider" class="joint-btn" title="Slider joint" data-joint="slider">
+                    <svg class="joint-icon" viewBox="134 1 56 31" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="4">
+                        <polyline points="137.36 4.48 156.46 4.48 168.34 16.36 156.58 28.12 138.08 28.12"/>
+                        <polyline points="186.16 4.72 165.53 4.72 177.69 16.88 165.69 28.88 187.2 28.88"/>
+                    </svg>
+                    <span class="joint-label">Slider</span>
+                </button>
+                <button id="joint-groove" class="joint-btn" title="Groove joint" data-joint="groove">
+                    <svg class="joint-icon" viewBox="-2 56 55 31" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="4">
+                        <polyline points=".92 59.43 17.14 59.43 26.45 68.74 35.6 59.59 49.89 59.59"/>
+                        <line x1="0" y1="83.47" x2="49.77" y2="83.47"/>
+                    </svg>
+                    <span class="joint-label">Groove</span>
+                </button>
+                <button id="joint-thread" class="joint-btn" title="Thread joint" data-joint="thread">
+                    <svg class="joint-icon" viewBox="66 56 57 31" fill="none" stroke="currentColor" stroke-miterlimit="10">
+                        <polyline points="69.99 59.15 86.53 59.15 119.28 59.15" stroke-width="4"/>
+                        <line x1="69.11" y1="83.23" x2="120" y2="83.23" stroke-width="4"/>
+                        <line x1="86.45" y1="83.31" x2="86.45" y2="59.15" stroke-width="4"/>
+                        <line x1="104.91" y1="59.07" x2="104.91" y2="83.15" stroke-width="4"/>
+                        <path d="M88.11,60.35c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                        <path d="M88.11,63.48c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                        <path d="M88.11,67.1c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                        <path d="M88.11,70.23c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                        <path d="M88.11,73.51c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                        <path d="M88.11,76.96c2.14,1.03,5.85,2.18,9.65,2.65,2.01.25,3.83.26,5.38.16" stroke-width="1"/>
+                    </svg>
+                    <span class="joint-label">Thread</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ═══ Parameter sections (shown/hidden per joint type) ═══ -->
+
+        <!-- Slant: angle, mode, thickness -->
+        <div id="params-slant" class="params-section" hidden>
+            <div class="param-row">
+                <span class="param-label">Angle</span>
+                <div class="angle-spinner">
+                    <button class="angle-arrow js-angle-inc" title="Increase">&#9652;</button>
+                    <button class="angle-arrow js-angle-dec" title="Decrease">&#9662;</button>
+                </div>
+                <div class="param-field">
+                    <input class="param-input js-angle" type="text" value="45°" data-param="angle">
+                </div>
+            </div>
+            <div class="radio-row">
+                <label class="radio-label"><input type="radio" name="mode-slant" class="radio-input" data-param="mode" data-value="outwards"> outward</label>
+                <label class="radio-label"><input type="radio" name="mode-slant" class="radio-input" data-param="mode" data-value="inwards" checked> inward</label>
+                <label class="radio-label"><input type="radio" name="mode-slant" class="radio-input" data-param="mode" data-value="translate"> translate</label>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Thickness</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="5mm" data-param="thickness">
+                </div>
+            </div>
+        </div>
+
+        <!-- Bevel: angle, mode (out/in only), thickness, depth -->
+        <div id="params-bevel" class="params-section" hidden>
+            <div class="param-row">
+                <span class="param-label">Angle</span>
+                <div class="angle-spinner">
+                    <button class="angle-arrow js-angle-inc" title="Increase">&#9652;</button>
+                    <button class="angle-arrow js-angle-dec" title="Decrease">&#9662;</button>
+                </div>
+                <div class="param-field">
+                    <input class="param-input js-angle" type="text" value="45°" data-param="angle">
+                </div>
+            </div>
+            <div class="radio-row">
+                <label class="radio-label"><input type="radio" name="mode-bevel" class="radio-input" data-param="mode" data-value="outwards"> outward</label>
+                <label class="radio-label"><input type="radio" name="mode-bevel" class="radio-input" data-param="mode" data-value="inwards" checked> inward</label>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Thickness</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="5mm" data-param="thickness">
+                </div>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Depth</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="50%" data-param="depth">
+                </div>
+            </div>
+        </div>
+
+        <!-- Slider: angle1+angle2 (chained), mode, thickness, depth -->
+        <div id="params-slider" class="params-section" hidden>
+            <div class="angle-pair">
+                <div class="angle-pair-rows">
+                    <div class="param-row">
+                        <span class="param-label">Angle 1</span>
+                        <div class="angle-spinner">
+                            <button class="angle-arrow js-angle-inc" title="Increase">&#9652;</button>
+                            <button class="angle-arrow js-angle-dec" title="Decrease">&#9662;</button>
+                        </div>
+                        <div class="param-field">
+                            <input class="param-input js-angle" type="text" value="45°" data-param="angle">
+                        </div>
+                    </div>
+                    <div class="param-row">
+                        <span class="param-label">Angle 2</span>
+                        <div class="angle-spinner">
+                            <button class="angle-arrow js-angle2-inc" title="Increase">&#9652;</button>
+                            <button class="angle-arrow js-angle2-dec" title="Decrease">&#9662;</button>
+                        </div>
+                        <div class="param-field">
+                            <input class="param-input js-angle2" type="text" value="45°" data-param="angle2">
+                        </div>
+                    </div>
+                </div>
+                <button class="chain-btn js-chain active" title="Link angles">
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+                        <path d="M4 7.5 L2.5 7.5 A2.5 2.5 0 0 1 2.5 2.5 L4 2.5"/>
+                        <path d="M8 2.5 L9.5 2.5 A2.5 2.5 0 0 1 9.5 7.5 L8 7.5"/>
+                        <line x1="4.5" y1="5" x2="7.5" y2="5"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="radio-row">
+                <label class="radio-label"><input type="radio" name="mode-slider" class="radio-input" data-param="mode" data-value="outwards"> outward</label>
+                <label class="radio-label"><input type="radio" name="mode-slider" class="radio-input" data-param="mode" data-value="inwards" checked> inward</label>
+                <label class="radio-label"><input type="radio" name="mode-slider" class="radio-input" data-param="mode" data-value="translate"> translate</label>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Thickness</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="5mm" data-param="thickness">
+                </div>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Depth</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="50%" data-param="depth">
+                </div>
+            </div>
+        </div>
+
+        <!-- Groove: angle1+angle2 (chained), thickness, depth -->
+        <div id="params-groove" class="params-section" hidden>
+            <div class="angle-pair">
+                <div class="angle-pair-rows">
+                    <div class="param-row">
+                        <span class="param-label">Angle 1</span>
+                        <div class="angle-spinner">
+                            <button class="angle-arrow js-angle-inc" title="Increase">&#9652;</button>
+                            <button class="angle-arrow js-angle-dec" title="Decrease">&#9662;</button>
+                        </div>
+                        <div class="param-field">
+                            <input class="param-input js-angle" type="text" value="45°" data-param="angle">
+                        </div>
+                    </div>
+                    <div class="param-row">
+                        <span class="param-label">Angle 2</span>
+                        <div class="angle-spinner">
+                            <button class="angle-arrow js-angle2-inc" title="Increase">&#9652;</button>
+                            <button class="angle-arrow js-angle2-dec" title="Decrease">&#9662;</button>
+                        </div>
+                        <div class="param-field">
+                            <input class="param-input js-angle2" type="text" value="45°" data-param="angle2">
+                        </div>
+                    </div>
+                </div>
+                <button class="chain-btn js-chain active" title="Link angles">
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+                        <path d="M4 7.5 L2.5 7.5 A2.5 2.5 0 0 1 2.5 2.5 L4 2.5"/>
+                        <path d="M8 2.5 L9.5 2.5 A2.5 2.5 0 0 1 9.5 7.5 L8 7.5"/>
+                        <line x1="4.5" y1="5" x2="7.5" y2="5"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Thickness</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="5mm" data-param="thickness">
+                </div>
+            </div>
+            <div class="param-row">
+                <span class="param-label">Depth</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="50%" data-param="depth">
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="spectrum-Body spectrum-Body--sizeXS status-bar"></div>
+    </div>
+
+    <script src="js/CSInterface.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

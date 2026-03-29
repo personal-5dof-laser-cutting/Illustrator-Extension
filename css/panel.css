@@ -1,0 +1,269 @@
+/* Panel layout */
+.panel-container {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 8px;
+    height: calc(100vh - 20px);
+}
+
+/* ── Joint-type button grid ── */
+.joint-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.joint-row {
+    display: flex;
+    gap: 4px;
+}
+
+.joint-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    height: 52px;
+    padding: 4px 2px;
+    border: 1px solid transparent;
+    border-radius: var(--spectrum-radius);
+    background-color: var(--spectrum-btn-bg);
+    color: var(--spectrum-btn-text);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 9px;
+    transition: background-color 100ms ease-out, border-color 100ms ease-out;
+    outline: none;
+}
+
+.joint-btn:hover {
+    background-color: var(--spectrum-btn-bg-hover);
+}
+
+.joint-btn:active {
+    background-color: var(--spectrum-btn-bg-down);
+}
+
+.joint-btn.active {
+    border-color: var(--spectrum-blue-400);
+    background-color: var(--spectrum-gray-200);
+}
+
+.joint-btn:focus-visible {
+    box-shadow: 0 0 0 2px var(--spectrum-blue-400);
+}
+
+.joint-btn.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+    cursor: default;
+}
+
+.joint-icon {
+    width: 36px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.joint-label {
+    line-height: 1;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+/* ── Parameter sections ── */
+.params-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.params-section[hidden] {
+    display: none;
+}
+
+/* ── Parameter row (label + field) — tabular layout ── */
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+}
+
+.param-label {
+    font-size: 11px;
+    color: var(--spectrum-gray-600);
+    width: 54px;
+    min-width: 54px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.param-icon {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    color: var(--spectrum-gray-600);
+    flex-shrink: 0;
+}
+
+.param-field {
+    display: flex;
+    align-items: stretch;
+    height: 22px;
+    flex: 1;
+    border: 1px solid var(--spectrum-gray-300);
+    border-radius: var(--spectrum-radius);
+    background: var(--spectrum-gray-100);
+    overflow: hidden;
+}
+
+.param-field:focus-within {
+    border-color: var(--spectrum-blue-400);
+}
+
+.param-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0 6px;
+    border: none;
+    background: transparent;
+    color: var(--spectrum-text);
+    font-family: inherit;
+    font-size: 11px;
+    outline: none;
+}
+
+/* ── Angle spinner ── */
+.angle-spinner {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+}
+
+.angle-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 10px;
+    padding: 0;
+    border: none;
+    border-radius: 2px;
+    background: transparent;
+    color: var(--spectrum-gray-600);
+    cursor: pointer;
+    font-size: 7px;
+    line-height: 1;
+    transition: color 100ms ease-out;
+}
+
+.angle-arrow:hover {
+    color: var(--spectrum-text);
+}
+
+/* ── Angle pair (two rows + chain button on right) ── */
+.angle-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.angle-pair-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+/* ── Chain / link button ── */
+.chain-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid var(--spectrum-gray-300);
+    border-radius: var(--spectrum-radius);
+    background: var(--spectrum-gray-50);
+    color: var(--spectrum-gray-500);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 100ms ease-out, border-color 100ms ease-out;
+}
+
+.chain-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.chain-btn:hover {
+    color: var(--spectrum-gray-700);
+    border-color: var(--spectrum-gray-400);
+}
+
+.chain-btn.active {
+    color: var(--spectrum-gray-800);
+    border-color: var(--spectrum-gray-400);
+}
+
+/* ── Radio toggle row ── */
+.radio-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 2px 0 2px 60px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--spectrum-gray-600);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.radio-label:hover {
+    color: var(--spectrum-text);
+}
+
+.radio-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #8a8a8a;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+    box-sizing: border-box;
+    transition: border-width 120ms ease-out, border-color 120ms ease-out;
+    flex-shrink: 0;
+}
+
+.radio-input:checked {
+    border-width: 5px;
+    border-color: #dbdbdb;
+}
+
+/* ── Status bar ── */
+.status-bar {
+    text-align: center;
+    min-height: 14px;
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+}
+
+.status-bar.visible {
+    opacity: 1;
+}

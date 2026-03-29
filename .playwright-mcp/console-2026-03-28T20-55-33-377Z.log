@@ -1,0 +1,25 @@
+[    1135ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opensource.adobe.com/spectrum-web-components/storybook/stories.json:0
+[    1263ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opensource.adobe.com/spectrum-web-components/storybook/metadata.json:0
+[   49272ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   49273ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   49274ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   49275ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   49276ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50094ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50106ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50117ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50128ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50140ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   50942ms] [ERROR] %c manager %c received %cstoryRenderPhaseChanged%c but was unable to determine the source of the event color: #37D5D3; background: black  color: #FF4785  @ https://opensource.adobe.com/spectrum-css/sb-manager/globals-runtime.js:6451
+[   50942ms] [ERROR] %c manager %c received %cstoryRenderPhaseChanged%c but was unable to determine the source of the event color: #37D5D3; background: black  color: #FF4785  @ https://opensource.adobe.com/spectrum-css/sb-manager/globals-runtime.js:6451
+[   50947ms] [ERROR] %c manager %c received %cstoryFinished%c but was unable to determine the source of the event color: #37D5D3; background: black  color: #FF4785  @ https://opensource.adobe.com/spectrum-css/sb-manager/globals-runtime.js:6451
+[   50947ms] [ERROR] %c manager %c received %cstoryRenderPhaseChanged%c but was unable to determine the source of the event color: #37D5D3; background: black  color: #FF4785  @ https://opensource.adobe.com/spectrum-css/sb-manager/globals-runtime.js:6451
+[   51227ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   51237ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   51248ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   51259ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   51271ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[   62256ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[  112708ms] [WARNING] The 'darkest' color is deprecated in Spectrum 2. Please use 'dark' instead. @ https://opensource.adobe.com/spectrum-css/assets/decorator-DlLJAwnS.js:22
+[  281999ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opensource.adobe.com/spectrum-web-components/storybook/stories.json:0
+[  282128ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://opensource.adobe.com/spectrum-web-components/storybook/metadata.json:0

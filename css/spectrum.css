@@ -1,0 +1,116 @@
+/*
+ * Minimal Adobe Spectrum CSS tokens for CEP panels.
+ * Matches Illustrator's native dark UI as closely as possible.
+ */
+
+/* ── Darkest theme tokens ── */
+:root {
+    --spectrum-gray-50:  #1d1d1d;
+    --spectrum-gray-75:  #232323;
+    --spectrum-gray-100: #2c2c2c;
+    --spectrum-gray-200: #393939;
+    --spectrum-gray-300: #4a4a4a;
+    --spectrum-gray-400: #5c5c5c;
+    --spectrum-gray-500: #7a7a7a;
+    --spectrum-gray-600: #999;
+    --spectrum-gray-700: #b3b3b3;
+    --spectrum-gray-800: #d5d5d5;
+    --spectrum-gray-900: #efefef;
+
+    --spectrum-blue-400: #2680eb;
+    --spectrum-blue-500: #378ef0;
+
+    --spectrum-bg:          var(--spectrum-gray-100);
+    --spectrum-text:        var(--spectrum-gray-800);
+    --spectrum-heading:     var(--spectrum-gray-900);
+    --spectrum-border:      var(--spectrum-gray-300);
+    --spectrum-btn-bg:      var(--spectrum-gray-300);
+    --spectrum-btn-bg-hover:var(--spectrum-gray-400);
+    --spectrum-btn-bg-down: var(--spectrum-gray-500);
+    --spectrum-btn-text:    var(--spectrum-gray-900);
+    --spectrum-btn-border:  transparent;
+
+    --spectrum-font: "Adobe Clean", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    --spectrum-radius: 4px;
+}
+
+/* Light theme overrides */
+.spectrum--light {
+    --spectrum-bg:          #f4f4f4;
+    --spectrum-text:        #4b4b4b;
+    --spectrum-heading:     #2c2c2c;
+    --spectrum-border:      #d0d0d0;
+    --spectrum-btn-bg:      #d0d0d0;
+    --spectrum-btn-bg-hover:#c0c0c0;
+    --spectrum-btn-bg-down: #b0b0b0;
+    --spectrum-btn-text:    #2c2c2c;
+}
+
+/* ── Base ── */
+.spectrum {
+    font-family: var(--spectrum-font);
+    font-size: 11px;
+    color: var(--spectrum-text);
+    background-color: var(--spectrum-bg);
+}
+
+body.spectrum {
+    margin: 0;
+    padding: 0;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+}
+
+/* ── Typography ── */
+.spectrum-Heading--sizeXS {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--spectrum-heading);
+    margin: 0;
+}
+
+.spectrum-Body--sizeXS {
+    font-size: 11px;
+    color: var(--spectrum-gray-600);
+}
+
+/* ── Action Button (quiet, matches Illustrator native controls) ── */
+.spectrum-ActionButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--spectrum-btn-border);
+    border-radius: var(--spectrum-radius);
+    background-color: var(--spectrum-btn-bg);
+    color: var(--spectrum-btn-text);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 400;
+    text-decoration: none;
+    transition: background-color 100ms ease-out;
+    outline: none;
+}
+
+.spectrum-ActionButton:hover {
+    background-color: var(--spectrum-btn-bg-hover);
+}
+
+.spectrum-ActionButton:active {
+    background-color: var(--spectrum-btn-bg-down);
+}
+
+.spectrum-ActionButton:focus-visible {
+    box-shadow: 0 0 0 2px var(--spectrum-blue-400);
+}
+
+.spectrum-ActionButton-label {
+    white-space: nowrap;
+    pointer-events: none;
+}
