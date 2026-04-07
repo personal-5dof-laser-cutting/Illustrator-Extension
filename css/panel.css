@@ -267,3 +267,30 @@
 .status-bar.visible {
     opacity: 1;
 }
+
+/* ── Apply Button ── */
+.apply-btn {
+    margin-top: auto;
+    height: 32px;
+    border: none;
+    border-radius: var(--spectrum-radius);
+    background-color: var(--spectrum-blue-400);
+    color: white;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 100ms ease-out;
+}
+
+.apply-btn:hover {
+    background-color: var(--spectrum-blue-500);
+}
+
+.apply-btn:active {
+    background-color: var(--spectrum-blue-600);
+}
+
+.apply-btn[hidden] {
+    display: none;
+}

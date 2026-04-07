@@ -20,16 +20,18 @@
         angle: 45,
         angle2: 45,
         chained: true,
-        mode: "inwards",
+        mode: "inward",
         thickness: 5,
         depth: 50,
         hasSelection: false,
         multiSelect: false,
-        multiCount: 0
+        multiCount: 0,
+        manuallySelected: false
     };
 
     // ── DOM refs ──
     var statusEl     = document.getElementById("status");
+    var applyBtn     = document.getElementById("apply-btn");
     var jointButtons = document.querySelectorAll(".joint-btn");
     var paramSections = {
         slant:  document.getElementById("params-slant"),
@@ -88,7 +90,7 @@
                 var param = input.dataset.param;
                 parseInput(input);
                 syncAllInputs();
-                remakeIfTagged(param);
+                // remakeIfTagged(param); // Disabled auto-apply
             });
 
             input.addEventListener("keydown", function (e) {
@@ -104,7 +106,7 @@
         (function (radio) {
             radio.addEventListener("change", function () {
                 state[radio.dataset.param] = radio.dataset.value;
-                remakeIfTagged(radio.dataset.param);
+                // remakeIfTagged(radio.dataset.param); // Disabled auto-apply
             });
         })(allRadios[s]);
     }
@@ -146,7 +148,7 @@
             state.angle2 = val;
         }
         syncAllInputs();
-        remakeIfTagged(param);
+        // remakeIfTagged(param); // Disabled auto-apply
     }
 
     // angle1 spinners
@@ -205,6 +207,14 @@
             }
         }
         syncChainButtons();
+        updateApplyButtonVisibility();
+    }
+
+    function updateApplyButtonVisibility() {
+        if (!applyBtn) return;
+        // Show apply button for any joint type except straight (revert) and thread (not implemented)
+        var show = state.hasSelection && state.joint !== "straight" && state.joint !== "thread" && state.joint !== "";
+        applyBtn.hidden = !show;
     }
 
     // ── Enable / disable all joint buttons ──
@@ -224,6 +234,14 @@
 
     function highlightJoint(jointId) {
         state.joint = jointId;
+        // If the user clicks a specific joint, they've manually selected it.
+        // We'll keep it active until the poll finds something tagged or selection is lost.
+        if (jointId !== "straight" && jointId !== "") {
+            state.manuallySelected = true;
+        } else {
+            state.manuallySelected = false;
+        }
+
         for (var i = 0; i < jointButtons.length; i++) {
             var btn = jointButtons[i];
             if (btn.dataset.joint === jointId) {
@@ -233,6 +251,7 @@
             }
         }
         showParamsFor(jointId);
+        updateApplyButtonVisibility();
     }
 
     // ── Poll selection state ──
@@ -248,13 +267,18 @@
             if (!result || result === "none" || result === "EvalScript unavailable") {
                 state.hasSelection = false;
                 state.multiSelect = false;
+                state.manuallySelected = false; // Reset on no selection
                 setButtonsEnabled(false);
                 showParamsFor("");
-            } else if (result.indexOf("multi:") === 0) {
+                updateApplyButtonVisibility();
+            } else if (result.indexOf("multi:") === 0 || result.indexOf("mixed:") === 0) {
                 // Multiple tagged groups selected
+                var isMixed = result.indexOf("mixed:") === 0;
                 state.hasSelection = true;
                 state.multiSelect = true;
-                var multiPayload = result.substr(6); // after "multi:"
+                state.manuallySelected = false; // Selection dictates tool
+                var multiPayload = result.split(":")[1];
+
                 var pipeIdx = multiPayload.indexOf("|");
                 state.multiCount = parseInt(multiPayload.substr(0, pipeIdx), 10);
                 // Parse first item's params to populate UI
@@ -263,27 +287,44 @@
                 var firstType = firstParts[0];
                 restoreParams(firstType, firstParts.slice(1));
                 setButtonsEnabled(true);
-                // Show params from first item but don't highlight a joint button
-                showParamsFor(firstType);
-                // Dim joint buttons — don't highlight any specific one
-                for (var jb = 0; jb < jointButtons.length; jb++) {
-                    jointButtons[jb].classList.remove("active");
+                
+                if (isMixed) {
+                    // Mixed types: don't highlight any joint
+                    showParamsFor(firstType);
+                    for (var jb = 0; jb < jointButtons.length; jb++) {
+                        jointButtons[jb].classList.remove("active");
+                    }
+                } else {
+                    // Same type: highlight it!
+                    highlightJoint(firstType);
                 }
                 state.joint = firstType; // keep for param section visibility
+                updateApplyButtonVisibility();
             } else if (result.indexOf("tagged:") === 0) {
                 state.hasSelection = true;
                 state.multiSelect = false;
+                state.manuallySelected = false; // Selection dictates tool
                 setButtonsEnabled(true);
                 var payload = result.substr(7);
                 var parts = payload.split("|");
                 var type = parts[0];
                 restoreParams(type, parts.slice(1));
                 highlightJoint(type);
+                updateApplyButtonVisibility();
             } else {
+                // "normal" — un-tagged selection
                 state.hasSelection = true;
                 state.multiSelect = false;
                 setButtonsEnabled(true);
-                highlightJoint("straight");
+                
+                if (state.manuallySelected) {
+                    // User has clicked a tool, stay on it.
+                    updateApplyButtonVisibility();
+                } else {
+                    // No manual tool, default to straight (revert)
+                    highlightJoint("straight");
+                    updateApplyButtonVisibility();
+                }
             }
         });
     }
@@ -370,6 +411,11 @@
         }
     }
 
+    function _log(msg) {
+        console.log("[DEBUG_LOG] " + msg);
+        // Also send to ExtendScript log if possible, or just keep in console
+    }
+
     function remakeIfTagged(changedParam) {
         if (!state.hasSelection) return;
         if (state.joint === "straight" || state.joint === "thread") return;
@@ -398,10 +444,19 @@
     for (var i = 0; i < jointButtons.length; i++) {
         (function (btn) {
             btn.addEventListener("click", function () {
-                applyJoint(btn.dataset.joint);
+                var jointId = btn.dataset.joint;
+                highlightJoint(jointId);
+                if (jointId === "straight") {
+                    applyJoint("straight");
+                }
             });
         })(jointButtons[i]);
     }
+
+    // ── Apply button click ──
+    applyBtn.addEventListener("click", function () {
+        applyJoint(state.joint);
+    });
 
     // ── Status message ──
 

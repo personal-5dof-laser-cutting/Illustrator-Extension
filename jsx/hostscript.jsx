@@ -51,7 +51,16 @@ function checkSelection() {
         // Multiple tagged groups — return multi:count|first_type_params
         // so the UI can show params from the first item
         var first = taggedList[0].note.substr(SVG5DOF_TAG.length);
-        var result2 = "multi:" + taggedList.length + "|" + first;
+        var firstType = first.split("|")[0];
+        // Check if all selected groups have the same type
+        var sameType = true;
+        for (var j = 1; j < taggedList.length; j++) {
+            if (taggedList[j].note.indexOf(SVG5DOF_TAG + firstType + "|") !== 0) {
+                sameType = false;
+                break;
+            }
+        }
+        var result2 = (sameType ? "multi:" : "mixed:") + taggedList.length + "|" + first;
         if (result2 !== _lastCheckLog) { _log("checkSel → " + result2); _lastCheckLog = result2; }
         return result2;
     } catch (e) {
@@ -90,62 +99,83 @@ function applyJoint(type, paramsStr) {
         var sel = doc.selection;
         if (!sel || sel.length === 0) return "Nothing selected.";
 
-        // Phase 1: collect unique tagged groups and normal items
-        // (don't unwrap yet — unwrapping deletes children that may
-        //  still appear later in sel[])
-        var taggedGroups = [];
-        var normalItems = [];
-        var seen = {};
-        for (var i = 0; i < sel.length; i++) {
-            var tagged = findTaggedAncestor(sel[i]);
+        // Step 1: Snapshot current selection
+        var selectedItems = [];
+        for (var s = 0; s < sel.length; s++) {
+            selectedItems.push(sel[s]);
+        }
+
+        // Step 2: For each selected item, recursively ungroup everything
+        var ungroupedItems = [];
+        for (var i = 0; i < selectedItems.length; i++) {
+            var item = selectedItems[i];
+            // First check if it's a tagged group - if so, unwrap it
+            var tagged = findTaggedAncestor(item);
             if (tagged) {
-                var key = tagged.name + "|" + tagged.note;
-                if (!seen[key]) {
-                    seen[key] = true;
-                    taggedGroups.push(tagged);
+                // Check if we've already processed this tagged group
+                var alreadyProcessed = false;
+                for (var p = 0; p < ungroupedItems.length; p++) {
+                    if (ungroupedItems[p] === tagged) {
+                        alreadyProcessed = true;
+                        break;
+                    }
                 }
-                // skip — this item belongs to a tagged group
+                if (!alreadyProcessed) {
+                    var unwrapped = unwrapGroup(tagged);
+                    if (unwrapped) {
+                        ungroupedItems.push(unwrapped);
+                    }
+                }
             } else {
-                normalItems.push(sel[i]);
+                ungroupedItems.push(item);
             }
         }
 
-        // Phase 2: unwrap all tagged groups (now safe — collection is done)
-        var items = [];
-        for (var g = 0; g < taggedGroups.length; g++) {
-            var orig = unwrapGroup(taggedGroups[g]);
-            if (orig) items.push(orig);
-        }
-        for (var n = 0; n < normalItems.length; n++) {
-            items.push(normalItems[n]);
+        // Step 3: Recursively ungroup all items until fully flattened
+        var flattenedItems = [];
+        for (var u = 0; u < ungroupedItems.length; u++) {
+            var recursiveResult = recursiveUngroup(ungroupedItems[u]);
+            for (var r = 0; r < recursiveResult.length; r++) {
+                flattenedItems.push(recursiveResult[r]);
+            }
         }
 
-        if (items.length === 0) return "Nothing to process.";
+        // Step 4: Remove all non-black lines from flattened items
+        var blackItems = [];
+        for (var f = 0; f < flattenedItems.length; f++) {
+            if (isBlackLine(flattenedItems[f])) {
+                blackItems.push(flattenedItems[f]);
+            } else {
+                try {
+                    flattenedItems[f].remove();
+                } catch (e) {}
+            }
+        }
 
+        if (blackItems.length === 0) return "No black lines to process.";
+
+        // Step 5: Apply tool to each black line
         var params = paramsStr.split("|");
         var results = [];
 
-        for (var j = 0; j < items.length; j++) {
-            var grp = rebuildJoint(doc, items[j], type, params);
+        // Ensure nothing is selected before we start building
+        deselectAll(doc);
+
+        for (var b = 0; b < blackItems.length; b++) {
+            var grp = rebuildJoint(doc, blackItems[b], type, params);
             if (grp) {
                 grp.note = SVG5DOF_TAG + type + "|" + paramsStr;
                 grp.name = "5DOF_" + type;
                 results.push(grp);
+                // Deselect everything after each rebuild to ensure clean state
+                deselectAll(doc);
             }
         }
 
-        // Select all rebuilt groups
-        deselectAll(doc);
-        if (results.length > 0) {
-            doc.selection = results;
-        }
+        // Step 6: Select all created groups at once
+        // Build selection array and assign it to doc.selection
+        doc.selection = results;
         app.redraw();
-
-        // Collapse undo steps for multi-object operations
-        if (results.length > 1) {
-            for (var u = 0; u < results.length; u++) app.undo();
-            for (var r = 0; r < results.length; r++) app.redo();
-        }
 
         return type.charAt(0).toUpperCase() + type.slice(1) +
                " applied to " + results.length + " object(s).";
@@ -185,9 +215,8 @@ function buildSlant(doc, item, params) {
     var black = item.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
     setAllStrokes(black, makeColor(0, 0, 0));
 
-    // Stash original
-    item.move(grp, ElementPlacement.PLACEATEND);
-    item.hidden = true;
+    // Remove original
+    item.remove();
 
     return grp;
 }
@@ -237,9 +266,8 @@ function buildBevel(doc, item, params) {
     }
     setAllStrokes(depthCopy, makeColor(grey, grey, grey));
 
-    // Stash original
-    item.move(grp, ElementPlacement.PLACEATEND);
-    item.hidden = true;
+    // Remove original
+    item.remove();
 
     return grp;
 }
@@ -271,13 +299,13 @@ function buildSlider(doc, item, params) {
     if (mode === "translate") {
         greyCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
         greyCopy.translate(widthPt, -widthPt);
-    } else if (mode === "outwards") {
+    } else if (mode === "outwards" || mode === "outward") {
         greyCopy = item.duplicate();
-        greyCopy = applyOffset(greyCopy, "outwards", widthPt);
+        greyCopy = applyOffset(greyCopy, "outward", widthPt);
         greyCopy.move(grp, ElementPlacement.PLACEATEND);
     } else {
         greyCopy = item.duplicate();
-        greyCopy = applyOffset(greyCopy, "inwards", widthPt);
+        greyCopy = applyOffset(greyCopy, "inward", widthPt);
         greyCopy.move(grp, ElementPlacement.PLACEATEND);
     }
     setAllStrokes(greyCopy, makeColor(grey, grey, grey));
@@ -286,9 +314,8 @@ function buildSlider(doc, item, params) {
     var cccCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
     setAllStrokes(cccCopy, makeColor(204, 204, 204));
 
-    // Stash original
-    item.move(grp, ElementPlacement.PLACEATEND);
-    item.hidden = true;
+    // Remove original
+    item.remove();
 
     return grp;
 }
@@ -305,7 +332,6 @@ function buildSlider(doc, item, params) {
 //    [0] black outward-offset copy (front)
 //    [1] grey copy at original position (middle)
 //    [2] black inward-offset copy (behind)
-//    [3] original (hidden)
 // ═══════════════════════════════════════════════
 
 function buildGroove(doc, item, params) {
@@ -324,7 +350,7 @@ function buildGroove(doc, item, params) {
 
     // Black outward-offset copy (front)
     var outCopy = item.duplicate();
-    outCopy = applyOffset(outCopy, "outwards", outDist);
+    outCopy = applyOffset(outCopy, "outward", outDist);
     outCopy.move(grp, ElementPlacement.PLACEATEND);
     setAllStrokes(outCopy, makeColor(0, 0, 0));
 
@@ -334,13 +360,12 @@ function buildGroove(doc, item, params) {
 
     // Black inward-offset copy (behind)
     var inCopy = item.duplicate();
-    inCopy = applyOffset(inCopy, "inwards", inDist);
+    inCopy = applyOffset(inCopy, "inward", inDist);
     inCopy.move(grp, ElementPlacement.PLACEATEND);
     setAllStrokes(inCopy, makeColor(0, 0, 0));
 
-    // Stash original
-    item.move(grp, ElementPlacement.PLACEATEND);
-    item.hidden = true;
+    // Remove original
+    item.remove();
 
     return grp;
 }
@@ -356,16 +381,35 @@ function revertToStraight() {
         var sel = doc.selection;
         if (!sel || sel.length === 0) return "Nothing selected.";
 
-        var tagged = findTaggedAncestor(sel[0]);
-        if (!tagged) return "Not a 5DOF group.";
-
-        var original = unwrapGroup(tagged);
-        if (original) {
-            doc.selection = [original];
-            app.redraw();
-            return "Reverted.";
+        var taggedGroups = [];
+        var seen = {};
+        for (var i = 0; i < sel.length; i++) {
+            var t = findTaggedAncestor(sel[i]);
+            if (t) {
+                var key = t.name + "|" + t.note;
+                if (!seen[key]) {
+                    seen[key] = true;
+                    taggedGroups.push(t);
+                }
+            }
         }
-        return "Error: no original found.";
+
+        if (taggedGroups.length === 0) return "No 5DOF groups selected.";
+
+        var results = [];
+        for (var g = 0; g < taggedGroups.length; g++) {
+            var original = unwrapGroup(taggedGroups[g]);
+            if (original) results.push(original);
+        }
+
+        if (results.length > 0) {
+            for (var r = 0; r < results.length; r++) {
+                results[r].selected = true;
+            }
+            app.redraw();
+            return "Reverted " + results.length + " object(s).";
+        }
+        return "No originals found.";
     } catch (e) {
         return "Error: " + e.message;
     }
@@ -430,28 +474,23 @@ function updateParam(paramName, paramValue) {
             var original = unwrapGroup(grpOld);
             if (!original) continue;
 
+            // NEW: Even for updates, we ensure the original is cleaned
+            var cleanedListU = prepareItem(original);
+
             var newParamsStr = params.join("|");
-            var newGrp = rebuildJoint(doc, original, type, params);
-
-            if (newGrp) {
-                newGrp.note = SVG5DOF_TAG + type + "|" + newParamsStr;
-                newGrp.name = "5DOF_" + type;
-                results.push(newGrp);
-                undoSteps++;
+            for (var clu = 0; clu < cleanedListU.length; clu++) {
+                var newGrp = rebuildJoint(doc, cleanedListU[clu], type, params);
+                if (newGrp) {
+                    newGrp.note = SVG5DOF_TAG + type + "|" + newParamsStr;
+                    newGrp.name = "5DOF_" + type;
+                    results.push(newGrp);
+                    undoSteps++;
+                }
             }
-        }
-
-        // Re-select all rebuilt groups
-        if (results.length > 0) {
-            deselectAll(doc);
-            doc.selection = results;
-            app.redraw();
         }
 
         // Collapse extra undo steps: undo all, then redo as one
         if (undoSteps > 1) {
-            // Store final state references
-            var finalSel = doc.selection;
             // Undo all individual steps
             for (var u = 0; u < undoSteps; u++) {
                 app.undo();
@@ -462,9 +501,154 @@ function updateParam(paramName, paramValue) {
             }
         }
 
+        // Re-select all rebuilt groups (must be done AFTER undo/redo hack)
+        // Selection should already be maintained; just ensure all results are selected
+        if (results.length > 0) {
+            for (var s = 0; s < results.length; s++) {
+                results[s].selected = true;
+            }
+            app.redraw();
+        }
+
         return "Updated " + results.length + " object(s).";
     } catch (e) {
         return "Error: " + e.message;
+    }
+}
+
+/**
+ * NEW: Prepare an item by recursively ungrouping and removing non-black lines.
+ */
+function prepareItem(item) {
+    // a) ungroup recursively
+    var unwrapResult = recursiveUngroup(item);
+    
+    // b) remove all non-black lines
+    // After ungrouping, we might have multiple items if it was a group.
+    // recursiveUngroup returns an array of base items.
+    for (var i = 0; i < unwrapResult.length; i++) {
+        removeNonBlackLines(unwrapResult[i]);
+    }
+    
+    // Filter out items that were removed by removeNonBlackLines
+    var finalResult = [];
+    for (var j = 0; j < unwrapResult.length; j++) {
+        try {
+            if (unwrapResult[j].typename) {
+                finalResult.push(unwrapResult[j]);
+            }
+        } catch (e) {}
+    }
+    
+    return finalResult;
+}
+
+function recursiveUngroup(item) {
+    var result = [];
+
+    if (item.typename === "GroupItem") {
+        // Collect children first to avoid live iterator issues
+        var children = [];
+        for (var i = 0; i < item.pageItems.length; i++) {
+            children.push(item.pageItems[i]);
+        }
+        for (var j = 0; j < children.length; j++) {
+            var child = children[j];
+            child.move(item, ElementPlacement.PLACEBEFORE);
+            var subResults = recursiveUngroup(child);
+            for (var k = 0; k < subResults.length; k++) {
+                result.push(subResults[k]);
+            }
+        }
+        try { item.remove(); } catch (e) {}
+    } else {
+        result.push(item);
+    }
+    return result;
+}
+
+/**
+ * Check if an item is a black line (stroked path/compound path with black stroke)
+ */
+function isBlackLine(item) {
+    try {
+        if (!item) return false;
+
+        if (item.typename === "PathItem") {
+            if (!item.stroked) return false;
+            var c = item.strokeColor;
+            if (c.typename === "RGBColor") {
+                return (c.red === 0 && c.green === 0 && c.blue === 0);
+            } else if (c.typename === "GrayColor") {
+                return (c.gray === 100);
+            } else if (c.typename === "CMYKColor") {
+                return (c.cyan === 0 && c.magenta === 0 && c.yellow === 0 && c.black === 100);
+            }
+            return false;
+        } else if (item.typename === "CompoundPathItem") {
+            if (!item.pathItems || item.pathItems.length === 0) return false;
+            var p = item.pathItems[0];
+            if (!p.stroked) return false;
+            var cc = p.strokeColor;
+            if (cc.typename === "RGBColor") {
+                return (cc.red === 0 && cc.green === 0 && cc.blue === 0);
+            } else if (cc.typename === "GrayColor") {
+                return (cc.gray === 100);
+            } else if (cc.typename === "CMYKColor") {
+                return (cc.cyan === 0 && cc.magenta === 0 && cc.yellow === 0 && cc.black === 100);
+            }
+            return false;
+        }
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
+function removeNonBlackLines(item) {
+    try {
+        if (!item) return;
+        if (item.typename === "PathItem") {
+            if (item.stroked) {
+                var c = item.strokeColor;
+                var isBlack = false;
+                if (c.typename === "RGBColor") {
+                    isBlack = (c.red === 0 && c.green === 0 && c.blue === 0);
+                } else if (c.typename === "GrayColor") {
+                    isBlack = (c.gray === 100);
+                } else if (c.typename === "CMYKColor") {
+                    // Check for standard CMYK black or Rich Black
+                    // In many cases, we just want K=100
+                    isBlack = (c.cyan === 0 && c.magenta === 0 && c.yellow === 0 && c.black === 100);
+                    // Also accept rich black if it's very dark? No, keep it simple.
+                }
+                
+                if (!isBlack) {
+                    item.remove();
+                    return;
+                }
+            }
+        } else if (item.typename === "CompoundPathItem") {
+            var isBlackComp = true;
+            if (item.pathItems && item.pathItems.length > 0) {
+                var p = item.pathItems[0];
+                if (p.stroked) {
+                    var cc = p.strokeColor;
+                    if (cc.typename === "RGBColor") {
+                        if (cc.red !== 0 || cc.green !== 0 || cc.blue !== 0) isBlackComp = false;
+                    } else if (cc.typename === "GrayColor") {
+                        if (cc.gray !== 100) isBlackComp = false;
+                    } else if (cc.typename === "CMYKColor") {
+                        if (cc.cyan !== 0 || cc.magenta !== 0 || cc.yellow !== 0 || cc.black !== 100) isBlackComp = false;
+                    } else {
+                        isBlackComp = false;
+                    }
+                }
+            }
+            if (!isBlackComp) item.remove();
+        }
+    } catch (e) {
+        _log("Error in removeNonBlackLines: " + e.message);
     }
 }
 
@@ -498,7 +682,7 @@ function applyOffset(item, mode, dist) {
         return item;
     }
 
-    var offsetDist = (mode === "inwards") ? -dist : dist;
+    var offsetDist = (mode === "inwards" || mode === "inward") ? -dist : dist;
     return runOffsetPath(item, offsetDist);
 }
 
@@ -566,27 +750,49 @@ function runOffsetPath(item, dist) {
 }
 
 /**
- * Unwrap a tagged group: restore the hidden original, delete the rest.
- * Searches recursively for the hidden item (expand can nest groups).
+ * Unwrap a tagged group: recursively ungroup all children and keep only black lines.
+ * Since we no longer stash hidden originals, we extract all black lines from the group.
  */
 function unwrapGroup(grp) {
-    var original = findHidden(grp);
+    _log("unwrapGroup: children=" + grp.pageItems.length);
 
-    _log("unwrapGroup: found=" + (original ? original.typename : "NULL") +
-         " children=" + grp.pageItems.length);
-
-    if (!original) {
-        // Fallback: if no hidden item found, just delete the group entirely
-        _log("unwrapGroup: no hidden original found, removing group");
-        grp.remove();
-        return null;
+    // Collect all children first
+    var children = [];
+    for (var i = 0; i < grp.pageItems.length; i++) {
+        children.push(grp.pageItems[i]);
     }
 
-    original.move(grp, ElementPlacement.PLACEBEFORE);
-    original.hidden = false;
+    // Move all children out of the group
+    for (var j = 0; j < children.length; j++) {
+        children[j].move(grp, ElementPlacement.PLACEBEFORE);
+    }
+
+    // Remove the empty group
     grp.remove();
 
-    return original;
+    // Now recursively ungroup all children and filter to black lines only
+    var allFlattened = [];
+    for (var k = 0; k < children.length; k++) {
+        var flattened = recursiveUngroup(children[k]);
+        for (var f = 0; f < flattened.length; f++) {
+            allFlattened.push(flattened[f]);
+        }
+    }
+
+    // Delete non-black lines
+    var blackOnly = [];
+    for (var b = 0; b < allFlattened.length; b++) {
+        if (isBlackLine(allFlattened[b])) {
+            blackOnly.push(allFlattened[b]);
+        } else {
+            try {
+                allFlattened[b].remove();
+            } catch (e) {}
+        }
+    }
+
+    // Return the first black line (or null if none found)
+    return blackOnly.length > 0 ? blackOnly[0] : null;
 }
 
 function findHidden(container) {
