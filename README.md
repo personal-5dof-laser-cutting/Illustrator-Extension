@@ -1,4 +1,4 @@
-# SVG 5DOF — Illustrator CEP Panel
+# SVG5DOF — Illustrator CEP Panel
 
 A CEP (Common Extensibility Platform) panel for Adobe Illustrator that generates decorative joint geometry on selected objects. Each joint type creates a tagged group containing styled copies of the original path — representing material edges, offset surfaces, and cut lines for 5 types of mechanical joints.
 
@@ -8,7 +8,7 @@ A CEP (Common Extensibility Platform) panel for Adobe Illustrator that generates
 ./install.sh
 ```
 
-This enables unsigned CEP extensions and symlinks the project into Illustrator's extensions folder. Restart Illustrator, then open **Window > Extensions > SVG 5DOF**.
+This enables unsigned CEP extensions and symlinks the project into Illustrator's extensions folder. Restart Illustrator, then open **Window > Extensions > SVG5DOF**.
 
 Requires Illustrator CC 2020+ (CSXS 9.0).
 

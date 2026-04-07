@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ExtensionManifest Version="6.0" ExtensionBundleId="com.example.offsetpanel"
     ExtensionBundleVersion="1.0.0"
-    ExtensionBundleName="SVG 5DOF"
+    ExtensionBundleName="SVG5DOF"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
     <ExtensionList>
@@ -36,7 +36,7 @@
                 </Lifecycle>
                 <UI>
                     <Type>Panel</Type>
-                    <Menu>SVG 5DOF</Menu>
+                    <Menu>SVG5DOF</Menu>
                     <Geometry>
                         <Size>
                             <Height>340</Height>
