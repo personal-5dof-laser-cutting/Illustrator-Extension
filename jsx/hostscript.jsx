@@ -103,6 +103,7 @@ function findTaggedAncestor(item) {
 
 function applyJoint(type, paramsStr) {
     try {
+        _log("Applying joint")
         if (app.documents.length === 0) return "No document open.";
         var doc = app.activeDocument;
         var sel = doc.selection;
@@ -209,384 +210,12 @@ function applyJoint(type, paramsStr) {
  * then extend/shorten the grey lines to meet at those same points.
  */
 function postProcessGreyLines(groups) {
-    try {
-        _log("postProcessGreyLines: processing " + groups.length + " groups");
 
-        // For each pair of groups
-        for (var i = 0; i < groups.length; i++) {
-            for (var j = i + 1; j < groups.length; j++) {
-                var grp1 = groups[i];
-                var grp2 = groups[j];
-
-                // Extract black and grey lines from each group
-                var lines1 = extractLinesFromGroup(grp1);
-                var lines2 = extractLinesFromGroup(grp2);
-
-                if (!lines1.black || !lines2.black) continue;
-
-                // Find intersection points between black lines
-                var intersections = [];
-                for (var b1 = 0; b1 < lines1.black.length; b1++) {
-                    for (var b2 = 0; b2 < lines2.black.length; b2++) {
-                        var pts = findPathIntersections(lines1.black[b1], lines2.black[b2]);
-                        if (pts && pts.length > 0) {
-                            for (var p = 0; p < pts.length; p++) {
-                                intersections.push(pts[p]);
-                            }
-                        }
-                    }
-                }
-
-                if (intersections.length > 0) {
-                    _log("Found " + intersections.length + " intersection(s) between groups");
-
-                    // For each grey line in both groups, extend/shorten to meet at intersections
-                    if (lines1.grey.length > 0 && lines2.grey.length > 0) {
-                        alignGreyLines(lines1.grey, lines2.grey, intersections);
-                    }
-                }
-            }
-        }
-    } catch (e) {
-        _log("postProcessGreyLines error: " + e.message);
-    }
-}
-
-/**
- * Extract black and grey lines from a group.
- * Returns {black: [PathItems], grey: [PathItems]}
- */
-function extractLinesFromGroup(grp) {
-    var blackLines = [];
-    var greyLines = [];
-
-    for (var i = 0; i < grp.pageItems.length; i++) {
-        var item = grp.pageItems[i];
-        if (isBlackLine(item)) {
-            blackLines.push(item);
-        } else if (item.typename === "GroupItem") {
-            // Handle nested groups (from offset path expansion)
-            var nested = extractLinesFromGroup(item);
-            blackLines.push(nested.black);
-            greyLines = greyLines.push(nested.grey);
-        } else {
-            greyLines.push(item);
-        }
-    }
-
-    return {black: blackLines, grey: greyLines};
-}
-
-/**
- * Find intersection points between two paths.
- * Returns array of {x, y} points.
- */
-function findPathIntersections(path1, path2) {
-    var intersections = [];
-
-    try {
-        // Get path points
-        var points1 = getPathEndpoints(path1);
-        var points2 = getPathEndpoints(path2);
-
-        if (!points1 || !points2) {
-            _log("findPathIntersections: Could not get endpoints");
-            return intersections;
-        }
-
-        // Check if endpoints are very close (within tolerance)
-        var tolerance = 2.0; // Increased tolerance (about 0.7mm)
-
-        var endpoints = [{p1: points1.start, p2: points2.start, name: "start-start"}, {
-            p1: points1.start,
-            p2: points2.end,
-            name: "start-end"
-        }, {p1: points1.end, p2: points2.start, name: "end-start"}, {
-            p1: points1.end,
-            p2: points2.end,
-            name: "end-end"
-        }];
-
-        for (var i = 0; i < endpoints.length; i++) {
-            var ep = endpoints[i];
-            var dx = ep.p1.x - ep.p2.x;
-            var dy = ep.p1.y - ep.p2.y;
-            var dist = Math.sqrt(dx * dx + dy * dy);
-
-            _log("Checking " + ep.name + ": dist=" + dist.toFixed(2));
-
-            if (dist < tolerance) {
-                // Found an intersection
-                var avgX = (ep.p1.x + ep.p2.x) / 2;
-                var avgY = (ep.p1.y + ep.p2.y) / 2;
-                _log("Found intersection at (" + avgX.toFixed(2) + ", " + avgY.toFixed(2) + ")");
-                intersections.push({x: avgX, y: avgY, endpoint1: ep.p1, endpoint2: ep.p2});
-            }
-        }
-    } catch (e) {
-        _log("findPathIntersections error: " + e.message);
-    }
-
-    return intersections;
-}
-
-/**
- * Get the start and end points of a path.
- */
-function getPathEndpoints(item) {
-    try {
-        if (item.typename === "PathItem") {
-            if (item.pathPoints.length >= 2) {
-                var start = item.pathPoints[0].anchor;
-                var end = item.pathPoints[item.pathPoints.length - 1].anchor;
-                return {start: {x: start[0], y: start[1]}, end: {x: end[0], y: end[1]}};
-            }
-        } else if (item.typename === "CompoundPathItem") {
-            if (item.pathItems.length > 0) {
-                return getPathEndpoints(item.pathItems[0]);
-            }
-        }
-    } catch (e) {
-        _log("getPathEndpoints error: " + e.message);
-    }
-    return null;
-}
-
-function areAligned(line1, line2) {
-    try {
-        var tolerance = 0.5; // Default tolerance in points (~0.15mm)
-
-        var points1 = getPathEndpoints(line1);
-        var points2 = getPathEndpoints(line2);
-
-        if (!points1 || !points2) {
-            return false;
-        }
-
-        // Check all four endpoint combinations
-        var endpoints = [
-            {p1: points1.start, p2: points2.start},
-            {p1: points1.start, p2: points2.end},
-            {p1: points1.end, p2: points2.start},
-            {p1: points1.end, p2: points2.end}
-        ];
-
-        for (var i = 0; i < endpoints.length; i++) {
-            var ep = endpoints[i];
-            var dx = ep.p1.x - ep.p2.x;
-            var dy = ep.p1.y - ep.p2.y;
-            var dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < tolerance) {
-                return true;
-            }
-        }
-
-        return false;
-    } catch (e) {
-        _log("areAligned error: " + e.message);
-        return false;
-    }
-}
-
-/**
- * Align grey lines to meet at intersection points.
- * Extends or shortens grey lines along their own direction so they meet.
- */
-function alignGreyLines(greyLines1, greyLines2, intersections) {
-
-    // Filter out grey lines that are already aligned with at least one line from the other group
-    var filteredGreyLines1 = [];
-    for (var i = 0; i < greyLines1.length; i++) {
-        var isAligned = false;
-        for (var j = 0; j < greyLines2.length; j++) {
-            if (areAligned(greyLines1[i], greyLines2[j])) {
-                _log("Removing aligned grey line from group 1");
-                isAligned = true;
-                break;
-            }
-        }
-        if (!isAligned) {
-            filteredGreyLines1.push(greyLines1[i]);
-        }
-    }
-
-    var filteredGreyLines2 = [];
-    for (var i = 0; i < greyLines2.length; i++) {
-        var isAligned = false;
-        for (var j = 0; j < greyLines1.length; j++) {
-            if (areAligned(greyLines2[i], greyLines1[j])) {
-                _log("Removing aligned grey line from group 2");
-                isAligned = true;
-                break;
-            }
-        }
-        if (!isAligned) {
-            filteredGreyLines2.push(greyLines2[i]);
-        }
-    }
-
-    _log("Grey lines after filtering - Group 1: " + filteredGreyLines1.length + ", Group 2: " + filteredGreyLines2.length);
-
-    try {
-        for (var i = 0; i < intersections.length; i++) {
-            var intersection = intersections[i];
-            // Find where grey lines from both groups intersect if extended
-            for (var g1 = 0; g1 < filteredGreyLines1.length; g1++) {
-                for (var g2 = 0; g2 < filteredGreyLines2.length; g2++) {
-                    var meetPoint = findGreyLineIntersection(filteredGreyLines1[g1], filteredGreyLines2[g2], intersection.endpoint1, intersection.endpoint2);
-                    if (meetPoint) {
-                        _log("Grey lines should meet at (" + meetPoint.x.toFixed(2) + ", " + meetPoint.y.toFixed(2) + ")");
-
-                        // Extend/shorten grey line 1 to meet point
-                        extendPathToPoint(filteredGreyLines1[g1], intersection.endpoint1, meetPoint);
-
-                        // Extend/shorten grey line 2 to meet point
-                        extendPathToPoint(filteredGreyLines2[g2], intersection.endpoint2, meetPoint);
-                    }
-                }
-            }
-        }
-    } catch (e) {
-        _log("alignGreyLines error: " + e.message);
-    }
-}
-
-/**
- * Find where two grey lines would intersect if extended along their directions.
- * blackEndpoint1 and blackEndpoint2 are the corresponding black line endpoints.
- */
-function findGreyLineIntersection(greyLine1, greyLine2, blackEndpoint1, blackEndpoint2) {
-    try {
-        // Get endpoints and directions for both grey lines
-        var grey1Data = getPathEndpointAndDirection(greyLine1, blackEndpoint1);
-        var grey2Data = getPathEndpointAndDirection(greyLine2, blackEndpoint2);
-
-        if (!grey1Data || !grey2Data) return null;
-
-        // Line 1: P1 + t * D1
-        // Line 2: P2 + s * D2
-        // Find intersection: P1 + t*D1 = P2 + s*D2
-
-        var p1x = grey1Data.endpoint.x;
-        var p1y = grey1Data.endpoint.y;
-        var d1x = grey1Data.direction.x;
-        var d1y = grey1Data.direction.y;
-
-        var p2x = grey2Data.endpoint.x;
-        var p2y = grey2Data.endpoint.y;
-        var d2x = grey2Data.direction.x;
-        var d2y = grey2Data.direction.y;
-
-        // Solve: p1x + t*d1x = p2x + s*d2x
-        //        p1y + t*d1y = p2y + s*d2y
-        // Rearrange: t*d1x - s*d2x = p2x - p1x
-        //            t*d1y - s*d2y = p2y - p1y
-
-        var det = d1x * d2y - d1y * d2x;
-        if (Math.abs(det) < 0.0001) {
-            _log("Lines are parallel, no intersection");
-            return null; // Lines are parallel
-        }
-
-        var dx = p2x - p1x;
-        var dy = p2y - p1y;
-
-        var t = (dx * d2y - dy * d2x) / det;
-
-        var intersectX = p1x + t * d1x;
-        var intersectY = p1y + t * d1y;
-
-        return {x: intersectX, y: intersectY};
-    } catch (e) {
-        _log("findGreyLineIntersection error: " + e.message);
-        return null;
-    }
-}
-
-/**
- * Get the endpoint nearest to blackEndpoint and the direction from that endpoint.
- */
-function getPathEndpointAndDirection(item, blackEndpoint) {
-    try {
-        if (item.typename === "PathItem" && item.pathPoints.length >= 2) {
-            var start = item.pathPoints[0].anchor;
-            var end = item.pathPoints[item.pathPoints.length - 1].anchor;
-
-            // Calculate distance from start and end to blackEndpoint
-            var distStart = Math.sqrt(Math.pow(start[0] - blackEndpoint.x, 2) + Math.pow(start[1] - blackEndpoint.y, 2));
-            var distEnd = Math.sqrt(Math.pow(end[0] - blackEndpoint.x, 2) + Math.pow(end[1] - blackEndpoint.y, 2));
-
-            var endpoint, otherPoint;
-            if (distStart < distEnd) {
-                // Start is closer to black endpoint
-                endpoint = {x: start[0], y: start[1]};
-                otherPoint = {x: item.pathPoints[1].anchor[0], y: item.pathPoints[1].anchor[1]};
-            } else {
-                // End is closer to black endpoint
-                endpoint = {x: end[0], y: end[1]};
-                var prevIdx = item.pathPoints.length - 2;
-                otherPoint = {x: item.pathPoints[prevIdx].anchor[0], y: item.pathPoints[prevIdx].anchor[1]};
-            }
-
-            // Calculate direction from otherPoint to endpoint (extending outward)
-            var dx = endpoint.x - otherPoint.x;
-            var dy = endpoint.y - otherPoint.y;
-            var length = Math.sqrt(dx * dx + dy * dy);
-
-            if (length < 0.001) return null;
-
-            // Normalize direction
-            dx /= length;
-            dy /= length;
-
-            return {
-                endpoint: endpoint, direction: {x: dx, y: dy}, isStart: distStart < distEnd
-            };
-        } else if (item.typename === "CompoundPathItem" && item.pathItems.length > 0) {
-            return getPathEndpointAndDirection(item.pathItems[0], blackEndpoint);
-        }
-    } catch (e) {
-        _log("getPathEndpointAndDirection error: " + e.message);
-    }
-    return null;
-}
-
-/**
- * Extend or shorten a path to reach targetPoint along its direction.
- */
-function extendPathToPoint(item, blackEndpoint, targetPoint) {
-    try {
-        var tolerance = 50;
-
-        if (item.typename === "PathItem" && item.pathPoints.length >= 2) {
-            var start = item.pathPoints[0].anchor;
-            var end = item.pathPoints[item.pathPoints.length - 1].anchor;
-
-            // Determine which endpoint is closer to blackEndpoint
-            var distStart = Math.sqrt(Math.pow(start[0] - blackEndpoint.x, 2) + Math.pow(start[1] - blackEndpoint.y, 2));
-            var distEnd = Math.sqrt(Math.pow(end[0] - blackEndpoint.x, 2) + Math.pow(end[1] - blackEndpoint.y, 2));
-
-            if (distStart < distEnd && distStart < tolerance) {
-                // Adjust start point
-                _log("Extending start from (" + start[0].toFixed(2) + "," + start[1].toFixed(2) + ") to (" + targetPoint.x.toFixed(2) + "," + targetPoint.y.toFixed(2) + ")");
-                item.pathPoints[0].anchor = [targetPoint.x, targetPoint.y];
-            } else if (distEnd < tolerance) {
-                // Adjust end point
-                _log("Extending end from (" + end[0].toFixed(2) + "," + end[1].toFixed(2) + ") to (" + targetPoint.x.toFixed(2) + "," + targetPoint.y.toFixed(2) + ")");
-                item.pathPoints[item.pathPoints.length - 1].anchor = [targetPoint.x, targetPoint.y];
-            }
-        } else if (item.typename === "CompoundPathItem" && item.pathItems.length > 0) {
-            extendPathToPoint(item.pathItems[0], blackEndpoint, targetPoint);
-        }
-    } catch (e) {
-        _log("extendPathToPoint error: " + e.message);
-    }
 }
 
 // ═══════════════════════════════════════════════
 //  Slant
-//  params: [angle, mode, thickness_mm, depth]
+//  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
 function buildSlant(doc, item, params) {
@@ -594,6 +223,8 @@ function buildSlant(doc, item, params) {
     var mode = params[1] || "translate";
     var thickness = parseFloat(params[2]) || 5;
     var depth = (parseFloat(params[3]) || 100) / 100;
+    var direction = parseFloat(params[4]) || 0;
+
     var dist = Math.tan(angle * Math.PI / 180) * thickness * PT_PER_MM;
     var depth_frac = depth; // Value between 0 and 1, 1 indicating 100% cut
 
@@ -602,7 +233,7 @@ function buildSlant(doc, item, params) {
 
     // Grey copy (behind) — offset along the normal of the path
     var grey = item.duplicate();  // duplicate at document level for Offset Path
-    grey = applyOffset(grey, mode, dist);
+    grey = applyOffset(grey, mode, dist, direction);
     grey.move(grp, ElementPlacement.PLACEATEND);
     setDepth(grey, depth_frac);
 
@@ -618,7 +249,7 @@ function buildSlant(doc, item, params) {
 
 // ═══════════════════════════════════════════════
 //  Bevel
-//  params: [angle, mode, thickness_mm, depth]
+//  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
 function buildBevel(doc, item, params) {
@@ -626,6 +257,8 @@ function buildBevel(doc, item, params) {
     var mode = params[1] || "inwards";
     var thickness = parseFloat(params[2]) || 5;
     var depth = (parseFloat(params[3]) || 50) / 100;
+    var direction = parseFloat(params[4]) || 0;
+
     var dist = Math.tan(angle * Math.PI / 180) * thickness * PT_PER_MM;
 
     var grp = doc.groupItems.add();
@@ -637,14 +270,14 @@ function buildBevel(doc, item, params) {
 
     // #ccc copy at offset position (behind)
     var cccCopy = item.duplicate();
-    cccCopy = applyOffset(cccCopy, mode, dist);
+    cccCopy = applyOffset(cccCopy, mode, dist, direction);
     cccCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(cccCopy, 1);
 
     // copy at same offset position (in front of #ccc)
     // Marks the boundary: slanted (black→grey) vs vertical (grey→#ccc)
     var depthCopy = item.duplicate();
-    depthCopy = applyOffset(depthCopy, mode, dist);
+    depthCopy = applyOffset(depthCopy, mode, dist, direction);
     depthCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(depthCopy, depth);
 
@@ -665,6 +298,8 @@ function buildSlider(doc, item, params) {
     // params[2] = chained flag (UI only)
     var mode = params[3] || "inwards";
     var thickness = parseFloat(params[4]) || 5;
+    var direction = parseFloat(params[5]) || 0;
+
     var widthPt = thickness * PT_PER_MM;
 
     var grp = doc.groupItems.add();
@@ -682,7 +317,7 @@ function buildSlider(doc, item, params) {
     var line_depth_frac = (off_mm * Math.sin(TO_RAD * (90 - angle)) / Math.sin(TO_RAD * angle)) / thickness;
 
     var greyCopy = item.duplicate();
-    greyCopy = applyOffset(greyCopy, mode, off_px);
+    greyCopy = applyOffset(greyCopy, mode, off_px, direction);
     greyCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(greyCopy, line_depth_frac)
 
@@ -725,7 +360,7 @@ function buildGroove(doc, item, params) {
 
     // Black outward-offset copy (front)
     var outCopy = item.duplicate();
-    outCopy = applyOffset(outCopy, "outward", outDist);
+    outCopy = applyOffset(outCopy, "outward", outDist, null);
     outCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(outCopy, 0);
 
@@ -735,7 +370,7 @@ function buildGroove(doc, item, params) {
 
     // Black inward-offset copy (behind)
     var inCopy = item.duplicate();
-    inCopy = applyOffset(inCopy, "inward", inDist);
+    inCopy = applyOffset(inCopy, "inward", inDist, null);
     inCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(inCopy, 0);
 
@@ -933,6 +568,15 @@ function calculatePathNormal(item) {
     }
 }
 
+function directionToNormal(direction) {
+    const radians = direction * Math.PI / 180;
+
+    return {
+        x: Math.cos(radians),
+        y: Math.sin(radians)
+    };
+}
+
 /**
  * Apply positional offset based on mode.
  *   translate:  move the copy by (dist, dist) in direction of normal
@@ -942,9 +586,12 @@ function calculatePathNormal(item) {
  * For inwards/outwards the item is replaced in-place by the offset result.
  * Returns the (possibly new) item.
  */
-function applyOffset(item, mode, dist) {
+function applyOffset(item, mode, dist, direction) {
     if (mode === "translate") {
-        var normal = calculatePathNormal(item);
+        var normal;
+        if (!direction)
+            normal = calculatePathNormal(item);
+        else normal = directionToNormal(direction);
         item.translate(normal.x * dist, normal.y * dist);
         return item;
     }

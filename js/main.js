@@ -23,6 +23,7 @@
         mode: "inward",
         thickness: 5,
         depth: 50,
+        direction: 0,
         hasSelection: false,
         multiSelect: false,
         multiCount: 0,
@@ -45,6 +46,7 @@
     var SUFFIXES = {
         angle: "\u00B0",
         angle2: "\u00B0",
+        direction: "\u00B0",
         depth: "%",
         thickness: "mm"
     };
@@ -60,6 +62,7 @@
         var raw = parseFloat(input.value) || 0;
 
         if (param === "angle" || param === "angle2") raw = Math.round(raw);
+        if (param === "direction") raw = ((Math.round(raw) % 360) + 360) % 360;
         if (param === "depth") raw = Math.max(0, Math.min(100, Math.round(raw)));
         if (param === "thickness") raw = Math.max(0.1, Math.round(raw * 10) / 10);
 
@@ -182,7 +185,60 @@
         for (var i = 0; i < inputs.length; i++) {
             formatInput(inputs[i]);
         }
+        updateDirectionGizmo(state.direction);
     }
+
+    // ── Direction gizmo ──
+
+    function updateDirectionGizmo(deg) {
+        var needles = document.querySelectorAll(".direction-needle");
+        var rad = deg * Math.PI / 180;
+        var x2 = (11 + 8 * Math.cos(rad)).toFixed(2);
+        var y2 = (11 - 8 * Math.sin(rad)).toFixed(2);
+        for (var i = 0; i < needles.length; i++) {
+            needles[i].setAttribute("x2", x2);
+            needles[i].setAttribute("y2", y2);
+        }
+    }
+
+    var activeDragGizmo = null;
+
+    function angleFromGizmo(e, gizmo) {
+        var rect = gizmo.getBoundingClientRect();
+        var dx = e.clientX - (rect.left + rect.width / 2);
+        var dy = e.clientY - (rect.top + rect.height / 2);
+        return ((Math.round(Math.atan2(-dy, dx) * 180 / Math.PI) % 360) + 360) % 360;
+    }
+
+    (function () {
+        var gizmos = document.querySelectorAll(".direction-gizmo");
+        for (var gi = 0; gi < gizmos.length; gi++) {
+            (function (gizmo) {
+                gizmo.addEventListener("mousedown", function (e) {
+                    activeDragGizmo = gizmo;
+                    gizmo.classList.add("dragging");
+                    state.direction = angleFromGizmo(e, gizmo);
+                    updateDirectionGizmo(state.direction);
+                    syncAllInputs();
+                    e.preventDefault();
+                });
+            })(gizmos[gi]);
+        }
+    })();
+
+    document.addEventListener("mousemove", function (e) {
+        if (!activeDragGizmo) return;
+        state.direction = angleFromGizmo(e, activeDragGizmo);
+        updateDirectionGizmo(state.direction);
+        syncAllInputs();
+    });
+
+    document.addEventListener("mouseup", function () {
+        if (activeDragGizmo) {
+            activeDragGizmo.classList.remove("dragging");
+            activeDragGizmo = null;
+        }
+    });
 
     // ── Show/hide param sections ──
 
@@ -204,6 +260,7 @@
             }
         }
         syncChainButtons();
+        updateDirectionGizmo(state.direction);
         updateApplyButtonVisibility();
     }
 
@@ -329,25 +386,27 @@
     // Restore state from tag params
     function restoreParams(type, parts) {
         if (type === "slant") {
-            // angle|mode|thickness|depth
+            // angle|mode|thickness|depth|direction
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
             if (parts[1] !== undefined) state.mode = parts[1];
             if (parts[2] !== undefined) state.thickness = parseFloat(parts[2]) || 5;
             if (parts[3] !== undefined) state.depth = parseFloat(parts[3]) || 100;
+            if (parts[4] !== undefined) state.direction = parseFloat(parts[4]) || 0;
         } else if (type === "bevel") {
-            // angle|mode|thickness|depth
+            // angle|mode|thickness|depth|direction
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
             if (parts[1] !== undefined) state.mode = parts[1];
             if (parts[2] !== undefined) state.thickness = parseFloat(parts[2]) || 5;
             if (parts[3] !== undefined) state.depth = parseFloat(parts[3]) || 50;
+            if (parts[4] !== undefined) state.direction = parseFloat(parts[4]) || 0;
         } else if (type === "slider") {
-            // angle|angle2|chained|mode|thickness|depth
+            // angle|angle2|chained|mode|thickness|depth|direction
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
             if (parts[1] !== undefined) state.angle2 = parseFloat(parts[1]) || 45;
             if (parts[2] !== undefined) state.chained = parts[2] === "1";
             if (parts[3] !== undefined) state.mode = parts[3];
             if (parts[4] !== undefined) state.thickness = parseFloat(parts[4]) || 5;
-            if (parts[5] !== undefined) state.depth = parseFloat(parts[5]) || 50;
+            if (parts[6] !== undefined) state.direction = parseFloat(parts[6]) || 0;
         } else if (type === "groove") {
             // angle|angle2|chained|thickness
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
@@ -365,12 +424,12 @@
     function buildParamString() {
         var type = state.joint;
         if (type === "slant") {
-            return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth;
+            return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth + "|" + state.direction;
         } else if (type === "bevel") {
-            return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth;
+            return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth + "|" + state.direction;
         } else if (type === "slider") {
             return state.angle + "|" + state.angle2 + "|" + (state.chained ? "1" : "0") +
-                   "|" + state.mode + "|" + state.thickness + "|" + state.depth;
+                   "|" + state.mode + "|" + state.thickness + "|" + state.direction;
         } else if (type === "groove") {
             return state.angle + "|" + state.angle2 + "|" + (state.chained ? "1" : "0") +
                    "|" + state.thickness;
@@ -388,6 +447,8 @@
         highlightJoint(jointId);
 
         function done(result) {
+            console.log("jsx done")
+            console.log(result)
             if (result && result !== "undefined" && result.indexOf("Error") !== 0) {
                 showStatus(result);
             }
@@ -402,6 +463,7 @@
             showStatus("Thread — coming soon");
             applying = false;
         } else {
+            console.log("Starting jsx exec")
             var params = buildParamString();
             var script = "applyJoint('" + jointId + "','" + params + "')";
             csInterface.evalScript(script, done);
@@ -428,6 +490,7 @@
 
     // ── Apply button click ──
     applyBtn.addEventListener("click", function () {
+        console.log("Apply button clicked");
         applyJoint(state.joint);
     });
 

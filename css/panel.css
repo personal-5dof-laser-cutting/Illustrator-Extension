@@ -217,7 +217,7 @@
 /* ── Radio toggle row ── */
 .radio-row {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 4px;
     padding: 2px 0 2px 60px;
 }
@@ -254,6 +254,38 @@
 .radio-input:checked {
     border-width: 5px;
     border-color: #dbdbdb;
+}
+
+/* ── Direction gizmo ── */
+.direction-gizmo {
+    flex-shrink: 0;
+    cursor: crosshair;
+    display: block;
+}
+
+.gizmo-ring {
+    fill: var(--spectrum-gray-100);
+    stroke: var(--spectrum-gray-400);
+    stroke-width: 1;
+    transition: stroke 100ms ease-out;
+}
+
+.direction-gizmo:hover .gizmo-ring {
+    stroke: var(--spectrum-gray-500);
+}
+
+.direction-gizmo.dragging .gizmo-ring {
+    stroke: var(--spectrum-blue-400);
+}
+
+.gizmo-needle {
+    stroke: var(--spectrum-gray-700);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+}
+
+.gizmo-dot {
+    fill: var(--spectrum-gray-700);
 }
 
 /* ── Status bar ── */
