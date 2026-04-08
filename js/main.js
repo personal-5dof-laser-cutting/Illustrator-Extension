@@ -59,7 +59,7 @@
         var param = input.dataset.param;
         var raw = parseFloat(input.value) || 0;
 
-        if (param === "angle" || param === "angle2") raw = Math.max(0, Math.min(360, Math.round(raw)));
+        if (param === "angle" || param === "angle2") raw = Math.round(raw);
         if (param === "depth") raw = Math.max(0, Math.min(100, Math.round(raw)));
         if (param === "thickness") raw = Math.max(0.1, Math.round(raw * 10) / 10);
 
@@ -90,7 +90,6 @@
                 var param = input.dataset.param;
                 parseInput(input);
                 syncAllInputs();
-                // remakeIfTagged(param); // Disabled auto-apply
             });
 
             input.addEventListener("keydown", function (e) {
@@ -106,7 +105,6 @@
         (function (radio) {
             radio.addEventListener("change", function () {
                 state[radio.dataset.param] = radio.dataset.value;
-                // remakeIfTagged(radio.dataset.param); // Disabled auto-apply
             });
         })(allRadios[s]);
     }
@@ -141,14 +139,13 @@
     // ── Angle spinners ──
 
     function adjustAngle(param, delta) {
-        var val = Math.max(0, Math.min(360, state[param] + delta));
+        var val = state[param] + delta;
         state[param] = val;
         if (state.chained) {
             state.angle = val;
             state.angle2 = val;
         }
         syncAllInputs();
-        // remakeIfTagged(param); // Disabled auto-apply
     }
 
     // angle1 spinners
@@ -416,30 +413,6 @@
         // Also send to ExtendScript log if possible, or just keep in console
     }
 
-    function remakeIfTagged(changedParam) {
-        if (!state.hasSelection) return;
-        if (state.joint === "straight" || state.joint === "thread") return;
-        if (applying) return;
-
-        if (state.multiSelect && changedParam) {
-            // Multi-select: update only the changed param on all selected groups
-            applying = true;
-            var val = state[changedParam];
-            var script = "updateParam('" + changedParam + "','" + val + "')";
-            csInterface.evalScript(script, function (result) {
-                if (result && result !== "undefined" && result.indexOf("Error") !== 0) {
-                    showStatus(result);
-                }
-                lastSelResult = "";
-                applying = false;
-                pollSelection();
-            });
-        } else {
-            applyJoint(state.joint);
-        }
-    }
-
-    // ── Joint button clicks ──
 
     for (var i = 0; i < jointButtons.length; i++) {
         (function (btn) {
