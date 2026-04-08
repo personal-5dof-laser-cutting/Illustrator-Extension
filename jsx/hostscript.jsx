@@ -548,15 +548,16 @@ function extendPathToPoint(item, blackEndpoint, targetPoint) {
 
 // ═══════════════════════════════════════════════
 //  Slant
-//  params: [angle, mode, thickness_mm] // TODO add depth_frac
+//  params: [angle, mode, thickness_mm, depth]
 // ═══════════════════════════════════════════════
 
 function buildSlant(doc, item, params) {
     var angle = parseFloat(params[0]) || 45;
     var mode = params[1] || "translate";
     var thickness = parseFloat(params[2]) || 5;
+    var depth = (parseFloat(params[3]) || 100) / 100;
     var dist = Math.tan(angle * Math.PI / 180) * thickness * PT_PER_MM;
-    var depth_frac = 1; // TODO: get as input, value between 0 and 1, 1 indicating 100% cut
+    var depth_frac = depth; // Value between 0 and 1, 1 indicating 100% cut
 
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
@@ -579,7 +580,7 @@ function buildSlant(doc, item, params) {
 
 // ═══════════════════════════════════════════════
 //  Bevel
-//  params: [angle, mode, thickness_mm, depth] TODO: mode needs translate option in frontend
+//  params: [angle, mode, thickness_mm, depth]
 // ═══════════════════════════════════════════════
 
 function buildBevel(doc, item, params) {
@@ -670,18 +671,16 @@ function buildSlider(doc, item, params) {
 //    [1] grey copy at original position (middle)
 //    [2] black inward-offset copy (behind)
 // ═══════════════════════════════════════════════
-// TODO: refactor to new structure
 
 function buildGroove(doc, item, params) {
     var angle1 = parseFloat(params[0]) || 45;
     var angle2 = parseFloat(params[1]) || 45;
     // params[2] = chained flag (UI only)
     var thickness = parseFloat(params[3]) || 5;
-    var depth = parseFloat(params[4]) || 50;
+    var depth = (parseFloat(params[4]) || 50) / 100;
 
-    var inDist = Math.tan(angle1 * Math.PI / 180) * thickness * PT_PER_MM * (depth / 100);
-    var outDist = Math.tan(angle2 * Math.PI / 180) * thickness * PT_PER_MM * (depth / 100);
-    var grey = Math.round(204 * depth / 100);
+    var inDist = Math.tan(angle1 * Math.PI / 180) * thickness * PT_PER_MM * depth;
+    var outDist = Math.tan(angle2 * Math.PI / 180) * thickness * PT_PER_MM * depth;
 
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
@@ -690,17 +689,17 @@ function buildGroove(doc, item, params) {
     var outCopy = item.duplicate();
     outCopy = applyOffset(outCopy, "outward", outDist);
     outCopy.move(grp, ElementPlacement.PLACEATEND);
-    setAllStrokes(outCopy, makeColor(0, 0, 0));
+    setDepth(outCopy, 0);
 
     // Grey copy at original position (middle)
     var greyCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
-    setAllStrokes(greyCopy, makeColor(grey, grey, grey));
+    setDepth(greyCopy, depth);
 
     // Black inward-offset copy (behind)
     var inCopy = item.duplicate();
     inCopy = applyOffset(inCopy, "inward", inDist);
     inCopy.move(grp, ElementPlacement.PLACEATEND);
-    setAllStrokes(inCopy, makeColor(0, 0, 0));
+    setDepth(inCopy, 0);
 
     // Remove original
     item.remove();

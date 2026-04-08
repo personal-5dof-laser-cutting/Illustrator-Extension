@@ -329,10 +329,11 @@
     // Restore state from tag params
     function restoreParams(type, parts) {
         if (type === "slant") {
-            // angle|mode|thickness
+            // angle|mode|thickness|depth
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
             if (parts[1] !== undefined) state.mode = parts[1];
             if (parts[2] !== undefined) state.thickness = parseFloat(parts[2]) || 5;
+            if (parts[3] !== undefined) state.depth = parseFloat(parts[3]) || 100;
         } else if (type === "bevel") {
             // angle|mode|thickness|depth
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
@@ -348,12 +349,11 @@
             if (parts[4] !== undefined) state.thickness = parseFloat(parts[4]) || 5;
             if (parts[5] !== undefined) state.depth = parseFloat(parts[5]) || 50;
         } else if (type === "groove") {
-            // angle|angle2|chained|thickness|depth
+            // angle|angle2|chained|thickness
             if (parts[0] !== undefined) state.angle = parseFloat(parts[0]) || 45;
             if (parts[1] !== undefined) state.angle2 = parseFloat(parts[1]) || 45;
             if (parts[2] !== undefined) state.chained = parts[2] === "1";
             if (parts[3] !== undefined) state.thickness = parseFloat(parts[3]) || 5;
-            if (parts[4] !== undefined) state.depth = parseFloat(parts[4]) || 50;
         }
     }
 
@@ -365,7 +365,7 @@
     function buildParamString() {
         var type = state.joint;
         if (type === "slant") {
-            return state.angle + "|" + state.mode + "|" + state.thickness;
+            return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth;
         } else if (type === "bevel") {
             return state.angle + "|" + state.mode + "|" + state.thickness + "|" + state.depth;
         } else if (type === "slider") {
@@ -373,7 +373,7 @@
                    "|" + state.mode + "|" + state.thickness + "|" + state.depth;
         } else if (type === "groove") {
             return state.angle + "|" + state.angle2 + "|" + (state.chained ? "1" : "0") +
-                   "|" + state.thickness + "|" + state.depth;
+                   "|" + state.thickness;
         }
         return "";
     }

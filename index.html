@@ -67,7 +67,7 @@
 
         <!-- ═══ Parameter sections (shown/hidden per joint type) ═══ -->
 
-        <!-- Slant: angle, mode, thickness -->
+        <!-- Slant: angle, mode, thickness, depth -->
         <div id="params-slant" class="params-section" hidden>
             <div class="param-row">
                 <span class="param-label">Angle</span>
@@ -90,9 +90,15 @@
                     <input class="param-input" type="text" value="5mm" data-param="thickness">
                 </div>
             </div>
+            <div class="param-row">
+                <span class="param-label">Depth</span>
+                <div class="param-field">
+                    <input class="param-input" type="text" value="100%" data-param="depth">
+                </div>
+            </div>
         </div>
 
-        <!-- Bevel: angle, mode (out/in only), thickness, depth -->
+        <!-- Bevel: angle, mode, thickness, depth -->
         <div id="params-bevel" class="params-section" hidden>
             <div class="param-row">
                 <span class="param-label">Angle</span>
@@ -107,6 +113,7 @@
             <div class="radio-row">
                 <label class="radio-label"><input type="radio" name="mode-bevel" class="radio-input" data-param="mode" data-value="outwards"> outward</label>
                 <label class="radio-label"><input type="radio" name="mode-bevel" class="radio-input" data-param="mode" data-value="inwards" checked> inward</label>
+                <label class="radio-label"><input type="radio" name="mode-bevel" class="radio-input" data-param="mode" data-value="translate"> translate</label>
             </div>
             <div class="param-row">
                 <span class="param-label">Thickness</span>
