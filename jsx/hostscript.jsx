@@ -578,10 +578,87 @@ function directionToNormal(direction) {
 }
 
 /**
+ * Check whether an item is an open path (a line, not a closed shape).
+ * Returns true for open PathItems and CompoundPathItems whose first sub-path is open.
+ */
+function isOpenPath(item) {
+    if (item.typename === "PathItem") {
+        return !item.closed;
+    }
+    if (item.typename === "CompoundPathItem" && item.pathItems.length > 0) {
+        return !item.pathItems[0].closed;
+    }
+    return false;
+}
+
+/**
+ * Extend (or shorten) an open-path line along its own direction.
+ *   dist > 0 → each endpoint moves outward by dist (line grows by 2*dist).
+ *   dist < 0 → each endpoint moves inward by |dist| (line shrinks by 2*|dist|).
+ *
+ * Works on both PathItem and CompoundPathItem (operates on every sub-path).
+ * Returns the same item (mutated in place).
+ */
+function extendLine(item, dist) {
+    var paths = [];
+    if (item.typename === "PathItem") {
+        paths.push(item);
+    } else if (item.typename === "CompoundPathItem") {
+        for (var i = 0; i < item.pathItems.length; i++) {
+            paths.push(item.pathItems[i]);
+        }
+    }
+
+    for (var p = 0; p < paths.length; p++) {
+        var pp = paths[p].pathPoints;
+        if (pp.length < 2) continue;
+
+        // --- First endpoint: extend away from second point ---
+        var a0 = pp[0].anchor;
+        var a1 = pp[1].anchor;
+        var dx0 = a0[0] - a1[0];
+        var dy0 = a0[1] - a1[1];
+        var len0 = Math.sqrt(dx0 * dx0 + dy0 * dy0);
+        if (len0 > 0.001) {
+            var ux0 = dx0 / len0;
+            var uy0 = dy0 / len0;
+            pp[0].anchor = [a0[0] + ux0 * dist, a0[1] + uy0 * dist];
+            // Move control handles by the same amount to preserve curvature
+            var ld0 = pp[0].leftDirection;
+            var rd0 = pp[0].rightDirection;
+            pp[0].leftDirection  = [ld0[0] + ux0 * dist, ld0[1] + uy0 * dist];
+            pp[0].rightDirection = [rd0[0] + ux0 * dist, rd0[1] + uy0 * dist];
+        }
+
+        // --- Last endpoint: extend away from second-to-last point ---
+        var last = pp.length - 1;
+        var aL = pp[last].anchor;
+        var aP = pp[last - 1].anchor;
+        var dxL = aL[0] - aP[0];
+        var dyL = aL[1] - aP[1];
+        var lenL = Math.sqrt(dxL * dxL + dyL * dyL);
+        if (lenL > 0.001) {
+            var uxL = dxL / lenL;
+            var uyL = dyL / lenL;
+            pp[last].anchor = [aL[0] + uxL * dist, aL[1] + uyL * dist];
+            var ldL = pp[last].leftDirection;
+            var rdL = pp[last].rightDirection;
+            pp[last].leftDirection  = [ldL[0] + uxL * dist, ldL[1] + uyL * dist];
+            pp[last].rightDirection = [rdL[0] + uxL * dist, rdL[1] + uyL * dist];
+        }
+    }
+
+    return item;
+}
+
+/**
  * Apply positional offset based on mode.
  *   translate:  move the copy by (dist, dist) in direction of normal
- *   outwards:   Illustrator Offset Path by +dist
- *   inwards:    Illustrator Offset Path by -dist
+ *   outwards:   Illustrator Offset Path by +dist  (or extend line for open paths)
+ *   inwards:    Illustrator Offset Path by -dist  (or shorten line for open paths)
+ *
+ * For open paths (lines) in inward/outward mode, the line is extended or
+ * shortened along its own direction instead of creating parallel offset paths.
  *
  * For inwards/outwards the item is replaced in-place by the offset result.
  * Returns the (possibly new) item.
@@ -596,6 +673,13 @@ function applyOffset(item, mode, dist, direction) {
         return item;
     }
 
+    // For open paths (lines): extend/shorten along line direction
+    if (isOpenPath(item)) {
+        var lineDist = (mode === "inwards" || mode === "inward") ? -dist : dist;
+        return extendLine(item, lineDist);
+    }
+
+    // For closed paths: use Illustrator Offset Path as before
     var offsetDist = (mode === "inwards" || mode === "inward") ? -dist : dist;
     return runOffsetPath(item, offsetDist);
 }
