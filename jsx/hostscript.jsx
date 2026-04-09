@@ -109,10 +109,16 @@ function applyJoint(type, paramsStr) {
         var sel = doc.selection;
         if (!sel || sel.length === 0) return "Nothing selected.";
 
-        // Step 1: Snapshot current selection
+        // Step 1: Snapshot current selection AND per-point selection states
+        // We store snapshots alongside original item references so we can look
+        // them up later after ungroup/flatten (items that survive unchanged keep
+        // the same reference; unwrapped items from tagged groups won't match and
+        // will be treated as fully selected).
         var selectedItems = [];
+        var selSnapshots = [];   // parallel array of {points: [...]} or null
         for (var s = 0; s < sel.length; s++) {
             selectedItems.push(sel[s]);
+            selSnapshots.push(snapshotPointSelection(sel[s]));
         }
 
         // Step 2: For each selected item, recursively ungroup everything
@@ -173,7 +179,15 @@ function applyJoint(type, paramsStr) {
         deselectAll(doc);
 
         for (var b = 0; b < blackItems.length; b++) {
-            var grp = rebuildJoint(doc, blackItems[b], type, params);
+            // Look up per-point selection snapshot for this item
+            var ptSnap = null;
+            for (var si = 0; si < selectedItems.length; si++) {
+                if (selectedItems[si] === blackItems[b]) {
+                    ptSnap = selSnapshots[si];
+                    break;
+                }
+            }
+            var grp = rebuildJoint(doc, blackItems[b], type, params, ptSnap);
             if (grp) {
                 grp.note = SVG5DOF_TAG + type + "|" + paramsStr;
                 grp.name = "5DOF_" + type;
@@ -218,7 +232,7 @@ function postProcessGreyLines(groups) {
 //  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
-function buildSlant(doc, item, params) {
+function buildSlant(doc, item, params, pointSelSnapshot) {
     var angle = parseFloat(params[0]) || 45;
     var mode = params[1] || "translate";
     var thickness = parseFloat(params[2]) || 5;
@@ -233,7 +247,7 @@ function buildSlant(doc, item, params) {
 
     // Grey copy (behind) — offset along the normal of the path
     var grey = item.duplicate();  // duplicate at document level for Offset Path
-    grey = applyOffset(grey, mode, dist, direction);
+    grey = applyOffset(grey, mode, dist, direction, pointSelSnapshot);
     grey.move(grp, ElementPlacement.PLACEATEND);
     setDepth(grey, depth_frac);
 
@@ -252,7 +266,7 @@ function buildSlant(doc, item, params) {
 //  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
-function buildBevel(doc, item, params) {
+function buildBevel(doc, item, params, pointSelSnapshot) {
     var angle = parseFloat(params[0]) || 45;
     var mode = params[1] || "inwards";
     var thickness = parseFloat(params[2]) || 5;
@@ -270,14 +284,14 @@ function buildBevel(doc, item, params) {
 
     // #ccc copy at offset position (behind)
     var cccCopy = item.duplicate();
-    cccCopy = applyOffset(cccCopy, mode, dist, direction);
+    cccCopy = applyOffset(cccCopy, mode, dist, direction, pointSelSnapshot);
     cccCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(cccCopy, 1);
 
     // copy at same offset position (in front of #ccc)
     // Marks the boundary: slanted (black→grey) vs vertical (grey→#ccc)
     var depthCopy = item.duplicate();
-    depthCopy = applyOffset(depthCopy, mode, dist, direction);
+    depthCopy = applyOffset(depthCopy, mode, dist, direction, pointSelSnapshot);
     depthCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(depthCopy, depth);
 
@@ -292,7 +306,7 @@ function buildBevel(doc, item, params) {
 //  params: [angle, angle2, chained, mode, thickness_mm, depth]
 // ═══════════════════════════════════════════════
 
-function buildSlider(doc, item, params) {
+function buildSlider(doc, item, params, pointSelSnapshot) {
     var angle = parseFloat(params[0]) || 45;
     var angle2 = parseFloat(params[1]) || 45;
     // params[2] = chained flag (UI only)
@@ -317,7 +331,7 @@ function buildSlider(doc, item, params) {
     var line_depth_frac = (off_mm * Math.sin(TO_RAD * (90 - angle)) / Math.sin(TO_RAD * angle)) / thickness;
 
     var greyCopy = item.duplicate();
-    greyCopy = applyOffset(greyCopy, mode, off_px, direction);
+    greyCopy = applyOffset(greyCopy, mode, off_px, direction, pointSelSnapshot);
     greyCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(greyCopy, line_depth_frac)
 
@@ -345,7 +359,7 @@ function buildSlider(doc, item, params) {
 //    [2] black inward-offset copy (behind)
 // ═══════════════════════════════════════════════
 
-function buildGroove(doc, item, params) {
+function buildGroove(doc, item, params, pointSelSnapshot) {
     var angle1 = parseFloat(params[0]) || 45;
     var angle2 = parseFloat(params[1]) || 45;
     // params[2] = chained flag (UI only)
@@ -360,7 +374,7 @@ function buildGroove(doc, item, params) {
 
     // Black outward-offset copy (front)
     var outCopy = item.duplicate();
-    outCopy = applyOffset(outCopy, "outward", outDist, null);
+    outCopy = applyOffset(outCopy, "outward", outDist, null, pointSelSnapshot);
     outCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(outCopy, 0);
 
@@ -370,7 +384,7 @@ function buildGroove(doc, item, params) {
 
     // Black inward-offset copy (behind)
     var inCopy = item.duplicate();
-    inCopy = applyOffset(inCopy, "inward", inDist, null);
+    inCopy = applyOffset(inCopy, "inward", inDist, null, pointSelSnapshot);
     inCopy.move(grp, ElementPlacement.PLACEATEND);
     setDepth(inCopy, 0);
 
@@ -492,12 +506,13 @@ function isBlackLine(item) {
 
 /**
  * Helper: rebuild a joint from an original item, given type and params array.
+ * pointSelSnapshot is an optional array of per-point selection states (from snapshotPointSelection).
  */
-function rebuildJoint(doc, item, type, params) {
-    if (type === "slant") return buildSlant(doc, item, params);
-    if (type === "bevel") return buildBevel(doc, item, params);
-    if (type === "slider") return buildSlider(doc, item, params);
-    if (type === "groove") return buildGroove(doc, item, params);
+function rebuildJoint(doc, item, type, params, pointSelSnapshot) {
+    if (type === "slant") return buildSlant(doc, item, params, pointSelSnapshot);
+    if (type === "bevel") return buildBevel(doc, item, params, pointSelSnapshot);
+    if (type === "slider") return buildSlider(doc, item, params, pointSelSnapshot);
+    if (type === "groove") return buildGroove(doc, item, params, pointSelSnapshot);
     return null;
 }
 
@@ -575,6 +590,187 @@ function directionToNormal(direction) {
         x: Math.cos(radians),
         y: Math.sin(radians)
     };
+}
+
+// ═══════════════════════════════════════════════
+//  Per-point selection snapshot & partial offset
+// ═══════════════════════════════════════════════
+
+/**
+ * Snapshot the per-point selection state of an item.
+ * Returns an array of booleans (true = selected) for each pathPoint,
+ * or null if the item is not a PathItem / has no points.
+ *
+ * A point counts as "selected" if its PathPointSelection is anything
+ * other than NOSELECTION.
+ */
+function snapshotPointSelection(item) {
+    var pp = null;
+    if (item.typename === "PathItem") {
+        pp = item.pathPoints;
+    } else if (item.typename === "CompoundPathItem" && item.pathItems.length > 0) {
+        pp = item.pathItems[0].pathPoints;
+    }
+    if (!pp || pp.length === 0) return null;
+
+    var result = [];
+    for (var i = 0; i < pp.length; i++) {
+        result.push(pp[i].selected !== PathPointSelection.NOSELECTION);
+    }
+    return result;
+}
+
+/**
+ * Check if a snapshot represents a *partial* selection on a closed path:
+ * at least one point selected AND at least one point not selected.
+ * Returns false for open paths, null snapshots, or all/none selected.
+ */
+function hasPartialSelection(item, snapshot) {
+    if (!snapshot) return false;
+    // Must be a closed path
+    if (item.typename === "PathItem" && !item.closed) return false;
+    if (item.typename === "CompoundPathItem") {
+        if (item.pathItems.length === 0 || !item.pathItems[0].closed) return false;
+    }
+
+    var hasSel = false, hasUnsel = false;
+    for (var i = 0; i < snapshot.length; i++) {
+        if (snapshot[i]) hasSel = true;
+        else hasUnsel = true;
+        if (hasSel && hasUnsel) return true;
+    }
+    return false;
+}
+
+/**
+ * Determine if a segment between point i and point i+1 (wrapping for closed paths)
+ * is "selected" — i.e. both endpoints are selected.
+ */
+function isSegmentSelected(snapshot, i, n) {
+    var j = (i + 1) % n;
+    return snapshot[i] && snapshot[j];
+}
+
+/**
+ * Compute the perpendicular normal of the segment from p1 to p2.
+ * Returns a normalized {x, y} vector. The normal is rotated 90° CCW
+ * from the segment direction (consistent with Illustrator's coordinate
+ * system where Y points down in screen but up in AI coords).
+ */
+function segmentNormal(p1, p2) {
+    var dx = p2[0] - p1[0];
+    var dy = p2[1] - p1[1];
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.0001) return {x: 0, y: 1};
+    // Normal perpendicular: rotate direction 90° CCW → (-dy, dx)
+    return {x: -dy / len, y: dx / len};
+}
+
+/**
+ * Intersect two infinite lines, each defined by a point and a direction vector.
+ * Line 1: p1 + t * d1
+ * Line 2: p2 + t * d2
+ * Returns the intersection point [x, y], or null if parallel.
+ */
+function lineLineIntersect(p1, d1, p2, d2) {
+    var cross = d1[0] * d2[1] - d1[1] * d2[0];
+    if (Math.abs(cross) < 1e-10) return null; // parallel
+    var dx = p2[0] - p1[0];
+    var dy = p2[1] - p1[1];
+    var t = (dx * d2[1] - dy * d2[0]) / cross;
+    return [p1[0] + t * d1[0], p1[1] + t * d1[1]];
+}
+
+/**
+ * Partially offset a closed polyline (straight segments only).
+ *
+ * Selected segments are moved by `dist` along their outward normal.
+ * Non-selected segments stay in place but are extended/trimmed so the
+ * path remains closed.
+ *
+ * `snapshot` is the boolean array from snapshotPointSelection().
+ * `dist` is signed: positive = outward, negative = inward.
+ *
+ * The item is mutated in place and returned.
+ */
+function partialOffsetClosedPath(item, dist, snapshot) {
+    var path;
+    if (item.typename === "PathItem") {
+        path = item;
+    } else if (item.typename === "CompoundPathItem" && item.pathItems.length > 0) {
+        path = item.pathItems[0];
+    } else {
+        return item;
+    }
+
+    var pp = path.pathPoints;
+    var n = pp.length;
+    if (n < 3) return item;
+
+    // Build array of original anchor positions
+    var orig = [];
+    for (var i = 0; i < n; i++) {
+        orig.push([pp[i].anchor[0], pp[i].anchor[1]]);
+    }
+
+    // For each segment, decide if it's selected (both endpoints selected)
+    var segSel = [];
+    for (var s = 0; s < n; s++) {
+        segSel.push(isSegmentSelected(snapshot, s, n));
+    }
+
+    // Compute the offset line for each segment:
+    //   - selected segments: shifted by dist along the segment normal
+    //   - non-selected segments: stay at original position
+    // Each segment i goes from orig[i] to orig[(i+1)%n].
+    // We store each as {p: point-on-line, d: direction-vector}.
+    var segLines = [];
+    for (var si = 0; si < n; si++) {
+        var i0 = si;
+        var i1 = (si + 1) % n;
+        var dx = orig[i1][0] - orig[i0][0];
+        var dy = orig[i1][1] - orig[i0][1];
+        if (segSel[si]) {
+            var norm = segmentNormal(orig[i0], orig[i1]);
+            var shiftedP = [orig[i0][0] + norm.x * dist, orig[i0][1] + norm.y * dist];
+            segLines.push({p: shiftedP, d: [dx, dy]});
+        } else {
+            segLines.push({p: [orig[i0][0], orig[i0][1]], d: [dx, dy]});
+        }
+    }
+
+    // Compute new vertices: each vertex i is the intersection of
+    // segment (i-1) and segment i.
+    var newPts = [];
+    for (var vi = 0; vi < n; vi++) {
+        var prevSeg = (vi - 1 + n) % n;
+        var curSeg = vi;
+        var pt = lineLineIntersect(
+            segLines[prevSeg].p, segLines[prevSeg].d,
+            segLines[curSeg].p, segLines[curSeg].d
+        );
+        if (pt) {
+            newPts.push(pt);
+        } else {
+            // Parallel segments (shouldn't happen in well-formed polygons)
+            // — fall back to shifted original point
+            if (segSel[curSeg]) {
+                var norm2 = segmentNormal(orig[curSeg], orig[(curSeg + 1) % n]);
+                newPts.push([orig[vi][0] + norm2.x * dist, orig[vi][1] + norm2.y * dist]);
+            } else {
+                newPts.push([orig[vi][0], orig[vi][1]]);
+            }
+        }
+    }
+
+    // Apply new positions to path points (straight segments: handles = anchor)
+    for (var ai = 0; ai < n; ai++) {
+        pp[ai].anchor = newPts[ai];
+        pp[ai].leftDirection = newPts[ai];
+        pp[ai].rightDirection = newPts[ai];
+    }
+
+    return item;
 }
 
 /**
@@ -660,10 +856,17 @@ function extendLine(item, dist) {
  * For open paths (lines) in inward/outward mode, the line is extended or
  * shortened along its own direction instead of creating parallel offset paths.
  *
+ * For closed paths with partial point selection (Direct Selection tool),
+ * only the selected segments are offset; non-selected segments extend/trim
+ * to keep the path closed.
+ *
  * For inwards/outwards the item is replaced in-place by the offset result.
  * Returns the (possibly new) item.
+ *
+ * pointSelSnapshot is an optional array of per-point booleans from
+ * snapshotPointSelection(), or null/undefined for full-path behaviour.
  */
-function applyOffset(item, mode, dist, direction) {
+function applyOffset(item, mode, dist, direction, pointSelSnapshot) {
     if (mode === "translate") {
         var normal;
         if (!direction)
@@ -679,7 +882,13 @@ function applyOffset(item, mode, dist, direction) {
         return extendLine(item, lineDist);
     }
 
-    // For closed paths: use Illustrator Offset Path as before
+    // For closed paths with partial selection: offset only selected segments
+    if (hasPartialSelection(item, pointSelSnapshot)) {
+        var partialDist = (mode === "inwards" || mode === "inward") ? -dist : dist;
+        return partialOffsetClosedPath(item, partialDist, pointSelSnapshot);
+    }
+
+    // For closed paths (fully selected or no snapshot): use Illustrator Offset Path as before
     var offsetDist = (mode === "inwards" || mode === "inward") ? -dist : dist;
     return runOffsetPath(item, offsetDist);
 }
