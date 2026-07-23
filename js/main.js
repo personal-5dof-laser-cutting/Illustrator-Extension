@@ -20,7 +20,7 @@
         angle: 45,
         angle2: 45,
         chained: true,
-        mode: "inward",
+        mode: "translate",
         thickness: 5,
         depth: 50,
         direction: 0,
@@ -103,11 +103,21 @@
 
     // ── Radio buttons ──
 
+    function updateDirectionVisibility() {
+        var el = document.getElementById("direction-group");
+        if (!el) return;
+        var hasDirection = (state.joint === "slant" || state.joint === "bevel" || state.joint === "slider");
+        el.style.display = (hasDirection && state.mode === "translate") ? "" : "none";
+    }
+
     var allRadios = document.querySelectorAll(".radio-input");
     for (var s = 0; s < allRadios.length; s++) {
         (function (radio) {
             radio.addEventListener("change", function () {
                 state[radio.dataset.param] = radio.dataset.value;
+                if (radio.dataset.param === "mode") {
+                    updateDirectionVisibility();
+                }
             });
         })(allRadios[s]);
     }
@@ -261,6 +271,10 @@
         }
         syncChainButtons();
         updateDirectionGizmo(state.direction);
+        updateDirectionVisibility();
+        // Format the shared direction input (outside param sections)
+        var dirInput = document.querySelector("#direction-group .param-input");
+        if (dirInput) formatInput(dirInput);
         updateApplyButtonVisibility();
     }
 

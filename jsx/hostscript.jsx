@@ -505,6 +505,32 @@ function isBlackLine(item) {
 }
 
 /**
+ * Check if an item is an "original" line — a depth-0 front line or a raw
+ * user-drawn line that has never been processed.
+ *
+ * Returns true for items whose note contains 'depth-0.000%' (set by setDepth)
+ * or items with no depth class in their note at all (raw lines).
+ * Returns false for items tagged with a non-zero depth class (blurred copies).
+ */
+function isOriginalLine(item) {
+    try {
+        var note = "";
+        if (item.typename === "PathItem" || item.typename === "CompoundPathItem") {
+            note = item.note || "";
+        } else {
+            return false;
+        }
+        // If the note contains a depth class that is NOT depth-0, it's a copy
+        if (note.indexOf("depth-") !== -1 && note.indexOf("depth-0.000%") === -1) {
+            return false;
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
  * Helper: rebuild a joint from an original item, given type and params array.
  * pointSelSnapshot is an optional array of per-point selection states (from snapshotPointSelection).
  */
@@ -975,7 +1001,7 @@ function unwrapGroup(grp) {
     // Remove the empty group
     grp.remove();
 
-    // Now recursively ungroup all children and filter to black lines only
+    // Now recursively ungroup all children and filter to original (depth-0) lines only
     var allFlattened = [];
     for (var k = 0; k < children.length; k++) {
         var flattened = recursiveUngroup(children[k]);
@@ -984,11 +1010,11 @@ function unwrapGroup(grp) {
         }
     }
 
-    // Delete non-black lines
-    var blackOnly = [];
+    // Delete non-original lines (blurred depth copies)
+    var originals = [];
     for (var b = 0; b < allFlattened.length; b++) {
-        if (isBlackLine(allFlattened[b])) {
-            blackOnly.push(allFlattened[b]);
+        if (isOriginalLine(allFlattened[b])) {
+            originals.push(allFlattened[b]);
         } else {
             try {
                 allFlattened[b].remove();
@@ -997,8 +1023,13 @@ function unwrapGroup(grp) {
         }
     }
 
-    // Return the first black line (or null if none found)
-    return blackOnly.length > 0 ? blackOnly[0] : null;
+    // Return the first original line (or null if none found)
+    // Clear the depth note so it behaves as a fresh line for reprocessing
+    if (originals.length > 0) {
+        try { originals[0].note = ""; } catch (e) {}
+        return originals[0];
+    }
+    return null;
 }
 
 /**
@@ -1030,8 +1061,28 @@ function setAllStrokes(item, color) {
 }
 
 function setDepth(item, depth_frac) {
-    setAllStrokes(item, makeDepthColor(depth_frac));
+    setAllStrokes(item, makeColor(0, 0, 0));
     setCSSClass(item, "depth-" + (depth_frac * 100).toFixed(3) + "%");
+    if (depth_frac > 0) {
+        var blurPx = depth_frac * 3.0;
+        applyBlur(item, blurPx);
+    }
+}
+
+/**
+ * Apply a Gaussian Blur live effect to an item.
+ * The blur remains as a non-destructive appearance effect.
+ */
+function applyBlur(item, radiusPx) {
+    var xml = '<LiveEffect name="Adobe PSL Gaussian Blur">'
+            + '<Dict data="R GBRd ' + radiusPx + ' "/>'
+            + '</LiveEffect>';
+    try {
+        item.applyEffect(xml);
+        _log("applyBlur " + radiusPx + "px OK");
+    } catch (e) {
+        _log("applyBlur FAILED: " + e.message);
+    }
 }
 
 function makeDepthColor(depth_frac) {
