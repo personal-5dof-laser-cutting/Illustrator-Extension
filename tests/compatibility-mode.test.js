@@ -37,19 +37,42 @@ test('compatibility depth matches the spec and retains metadata for revert', () 
     }
 });
 
-test('disabling compatibility preserves black strokes and depth-dependent native blur', () => {
+test('native blur initializes the Illustrator radius and scales with depth and stroke width', () => {
     const ctx = host();
-    for (const depth of [0, 0.5, 1]) {
-        const item = path();
-        ctx.setDepth(item, depth, false);
-        assert.equal(item.strokeColor.red, 0);
-        assert.equal(item.effects.length, depth > 0 ? 1 : 0);
-        assert.equal(item.strokeWidth, 2);
-        if (depth > 0) {
-            assert.match(item.effects[0], /LiveEffect name="Adobe PSL Gaussian Blur"/);
-            assert.ok(item.effects[0].includes('R GBRd ' + depth * 3 + ' '));
+    for (const width of [0.25, 2, 8]) {
+        for (const depth of [0, 0.25, 0.5, 1]) {
+            const item = path();
+            item.strokeWidth = width;
+            ctx.setDepth(item, depth, false);
+            assert.equal(item.strokeColor.red, 0);
+            assert.equal(item.effects.length, depth > 0 ? 1 : 0);
+            assert.equal(item.strokeWidth, width);
+            if (depth > 0) {
+                assert.match(item.effects[0], /LiveEffect name="Adobe PSL Gaussian Blur"/);
+                assert.ok(item.effects[0].includes('R blur ' + 6 * depth * width + ' '));
+                assert.doesNotMatch(item.effects[0], /GBRd/);
+            }
         }
     }
+});
+
+test('native blur uses compound appearance once and scales grouped paths independently', () => {
+    const ctx = host();
+    const thin = path();
+    thin.strokeWidth = 0.5;
+    const thick = path();
+    thick.strokeWidth = 4;
+    const compound = {
+        typename: 'CompoundPathItem', pathItems: [path(), path()], effects: [],
+        applyEffect(xml) { this.effects.push(xml); }
+    };
+    const group = { typename: 'GroupItem', pageItems: [thin, thick, compound] };
+    ctx.setDepth(group, 0.5, false);
+    assert.match(thin.effects[0], /R blur 1\.5 /);
+    assert.match(thick.effects[0], /R blur 12 /);
+    assert.equal(compound.effects.length, 1);
+    assert.match(compound.effects[0], /R blur 6 /);
+    assert.ok(compound.pathItems.every(item => item.effects.length === 0));
 });
 
 test('all joint builders propagate the option to every generated line', () => {

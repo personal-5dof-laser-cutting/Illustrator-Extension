@@ -18,7 +18,7 @@ Requires Illustrator CC 2020+ (CSXS 9.0).
 
 Stroke width also increases linearly with depth: entry lines keep the source width, 50% depth uses 1.5×, and exit lines (20% darkness) use 2×.
 
-Uncheck it before applying to use black strokes with the original width and Illustrator's native Gaussian Blur live effect. Changing the checkbox takes effect on the next Apply. Class-based SVG5DOF export is still a separate task.
+Uncheck it before applying to use black strokes with the original width and Illustrator's native Gaussian Blur live effect. The blur radius is 6 × relative cutting depth × stroke width (in points): 50% depth on a 2pt stroke gives a 6pt radius, and 100% gives 12pt; entry lines at 0% stay sharp. This stronger native blur is inspired by the broad depth visualization in the [SVG5DOF demo models](https://github.com/personal-5dof-laser-cutting/svg5dof/tree/main/demo%20models). Changing the checkbox takes effect on the next Apply. Class-based SVG5DOF export is still a separate task.
 
 Profiles can be applied to stroked paths of any color, including compound paths. Unsupported artwork is skipped rather than deleted.
 

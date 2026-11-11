@@ -14,6 +14,9 @@
 
 var SVG5DOF_TAG = "SVG5DOF:";
 var PT_PER_MM = 2.834645669;
+// SVG5DOF demos use broad depth blur (typically 1.5px on a 1px stroke).
+// Use a stronger native radius for a clearly spread-out appearance in Illustrator.
+var DEPTH_BLUR_WIDTH_MULTIPLIER = 6.0;
 
 // ═══════════════════════════════════════════════
 //  Selection polling
@@ -1067,7 +1070,7 @@ function setDepth(item, depth_frac, compatibilityMode) {
     setAllStrokes(item, compatible ? makeDepthColor(depth_frac) : makeColor(0, 0, 0),
                   compatible ? 1 + depth_frac : 1);
     if (!compatible && depth_frac > 0) {
-        applyBlur(item, depth_frac * 3.0);
+        applyDepthBlur(item, depth_frac);
     }
     // Notes are internal metadata for revert/rebuild, not exported SVG classes.
     setCSSClass(item, "depth-" + (depth_frac * 100).toFixed(3) + "%");
@@ -1075,16 +1078,44 @@ function setDepth(item, depth_frac, compatibilityMode) {
 }
 
 /**
+ * Scale blur in document points with both relative depth and stroke width.
+ * Compound paths share appearance, so apply one effect to the compound rather
+ * than stacking effects on its component paths. Groups can contain widths
+ * that differ, so style their children individually.
+ */
+function applyDepthBlur(item, depth_frac) {
+    if (item.typename === "PathItem") {
+        if (item.stroked && item.strokeWidth > 0) {
+            applyBlur(item, DEPTH_BLUR_WIDTH_MULTIPLIER * depth_frac * item.strokeWidth);
+        }
+    } else if (item.typename === "CompoundPathItem") {
+        for (var i = 0; i < item.pathItems.length; i++) {
+            var path = item.pathItems[i];
+            if (path.stroked && path.strokeWidth > 0) {
+                applyBlur(item, DEPTH_BLUR_WIDTH_MULTIPLIER * depth_frac * path.strokeWidth);
+                break;
+            }
+        }
+    } else if (item.typename === "GroupItem") {
+        for (var j = 0; j < item.pageItems.length; j++) {
+            applyDepthBlur(item.pageItems[j], depth_frac);
+        }
+    }
+}
+
+/**
  * Apply a Gaussian Blur live effect to an item.
  * The blur remains as a non-destructive appearance effect.
  */
-function applyBlur(item, radiusPx) {
+function applyBlur(item, radiusPt) {
+    // Illustrator's live-effect dictionary expects "blur". "GBRd" creates an
+    // appearance entry without initializing its radius until the dialog is OK'd.
     var xml = '<LiveEffect name="Adobe PSL Gaussian Blur">'
-            + '<Dict data="R GBRd ' + radiusPx + ' "/>'
+            + '<Dict data="R blur ' + radiusPt + ' "/>'
             + '</LiveEffect>';
     try {
         item.applyEffect(xml);
-        _log("applyBlur " + radiusPx + "px OK");
+        _log("applyBlur " + radiusPt + "pt OK");
     } catch (e) {
         _log("applyBlur FAILED: " + e.message);
     }
