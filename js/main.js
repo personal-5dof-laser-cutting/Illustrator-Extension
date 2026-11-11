@@ -32,6 +32,7 @@
 
     // ── DOM refs ──
     var statusEl     = document.getElementById("status");
+    var compatibilityMode = document.getElementById("compatibility-mode");
     var applyBtn     = document.getElementById("apply-btn");
     var jointButtons = document.querySelectorAll(".joint-btn");
     var paramSections = {
@@ -463,7 +464,7 @@
         function done(result) {
             console.log("jsx done")
             console.log(result)
-            if (result && result !== "undefined" && result.indexOf("Error") !== 0) {
+            if (result && result !== "undefined") {
                 showStatus(result);
             }
             lastSelResult = "";
@@ -479,7 +480,7 @@
         } else {
             console.log("Starting jsx exec")
             var params = buildParamString();
-            var script = "applyJoint('" + jointId + "','" + params + "')";
+            var script = "applyJoint('" + jointId + "','" + params + "'," + compatibilityMode.checked + ")";
             csInterface.evalScript(script, done);
         }
     }

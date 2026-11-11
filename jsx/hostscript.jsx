@@ -2,7 +2,7 @@
  * ExtendScript for Adobe Illustrator — SVG 5DOF joint operations.
  *
  * checkSelection()              — returns selection state string for the panel.
- * applyJoint(type, paramsStr)   — wraps selected item in a tagged group.
+ * applyJoint(type, paramsStr, compatibilityMode)   — wraps selected item in a tagged group.
  * revertToStraight()            — unwraps a tagged group back to the original.
  *
  * Tag format stored in group.note:
@@ -101,7 +101,7 @@ function findTaggedAncestor(item) {
     return null;
 }
 
-function applyJoint(type, paramsStr) {
+function applyJoint(type, paramsStr, compatibilityMode) {
     try {
         _log("Applying joint")
         if (app.documents.length === 0) return "No document open.";
@@ -156,38 +156,34 @@ function applyJoint(type, paramsStr) {
             }
         }
 
-        // Step 4: Remove all non-black lines from flattened items
-        var blackItems = [];
+        // Step 4: Accept stroked paths of any color. Unrelated artwork is
+        // skipped, never deleted just because it cannot become an edge profile.
+        var edgeItems = [];
         for (var f = 0; f < flattenedItems.length; f++) {
-            if (isBlackLine(flattenedItems[f])) {
-                blackItems.push(flattenedItems[f]);
-            } else {
-                try {
-                    flattenedItems[f].remove();
-                } catch (e) {
-                }
+            if (isStrokedPath(flattenedItems[f])) {
+                edgeItems.push(flattenedItems[f]);
             }
         }
 
-        if (blackItems.length === 0) return "No black lines to process.";
+        if (edgeItems.length === 0) return "No stroked paths to process.";
 
-        // Step 5: Apply tool to each black line
+        // Step 5: Apply the tool to each edge
         var params = paramsStr.split("|");
         var results = [];
 
         // Ensure nothing is selected before we start building
         deselectAll(doc);
 
-        for (var b = 0; b < blackItems.length; b++) {
+        for (var b = 0; b < edgeItems.length; b++) {
             // Look up per-point selection snapshot for this item
             var ptSnap = null;
             for (var si = 0; si < selectedItems.length; si++) {
-                if (selectedItems[si] === blackItems[b]) {
+                if (selectedItems[si] === edgeItems[b]) {
                     ptSnap = selSnapshots[si];
                     break;
                 }
             }
-            var grp = rebuildJoint(doc, blackItems[b], type, params, ptSnap);
+            var grp = rebuildJoint(doc, edgeItems[b], type, params, ptSnap, compatibilityMode);
             if (grp) {
                 grp.note = SVG5DOF_TAG + type + "|" + paramsStr;
                 grp.name = "5DOF_" + type;
@@ -232,7 +228,7 @@ function postProcessGreyLines(groups) {
 //  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
-function buildSlant(doc, item, params, pointSelSnapshot) {
+function buildSlant(doc, item, params, pointSelSnapshot, compatibilityMode) {
     var angle = parseFloat(params[0]) || 45;
     var mode = params[1] || "translate";
     var thickness = parseFloat(params[2]) || 5;
@@ -245,20 +241,25 @@ function buildSlant(doc, item, params, pointSelSnapshot) {
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
 
-    // Grey copy (behind) — offset along the normal of the path
-    var grey = item.duplicate();  // duplicate at document level for Offset Path
-    grey = applyOffset(grey, mode, dist, direction, pointSelSnapshot);
-    grey.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(grey, depth_frac);
+    try {
+        // Grey copy (behind) — offset along the normal of the path
+        var grey = item.duplicate();  // duplicate at document level for Offset Path
+        grey = applyOffset(grey, mode, dist, direction, pointSelSnapshot);
+        grey.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(grey, depth_frac, compatibilityMode);
 
-    // front (copy of original)
-    var front_line = item.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
-    setDepth(front_line, 0);
+        // front (copy of original)
+        var front_line = item.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
+        setDepth(front_line, 0, compatibilityMode);
 
-    // Remove original
-    item.remove();
+        // Remove original
+        item.remove();
 
-    return grp;
+        return grp;
+    } catch (e) {
+        grp.remove();
+        throw e;
+    }
 }
 
 // ═══════════════════════════════════════════════
@@ -266,7 +267,7 @@ function buildSlant(doc, item, params, pointSelSnapshot) {
 //  params: [angle, mode, thickness_mm, depth, direction]
 // ═══════════════════════════════════════════════
 
-function buildBevel(doc, item, params, pointSelSnapshot) {
+function buildBevel(doc, item, params, pointSelSnapshot, compatibilityMode) {
     var angle = parseFloat(params[0]) || 45;
     var mode = params[1] || "inwards";
     var thickness = parseFloat(params[2]) || 5;
@@ -278,27 +279,32 @@ function buildBevel(doc, item, params, pointSelSnapshot) {
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
 
-    // Black copy at original position (front)
-    var blackCopy = item.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
-    setAllStrokes(blackCopy, makeColor(0, 0, 0));
+    try {
+        // Black copy at original position (front)
+        var blackCopy = item.duplicate(grp, ElementPlacement.PLACEATBEGINNING);
+        setDepth(blackCopy, 0, compatibilityMode);
 
-    // #ccc copy at offset position (behind)
-    var cccCopy = item.duplicate();
-    cccCopy = applyOffset(cccCopy, mode, dist, direction, pointSelSnapshot);
-    cccCopy.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(cccCopy, 1);
+        // #ccc copy at offset position (behind)
+        var cccCopy = item.duplicate();
+        cccCopy = applyOffset(cccCopy, mode, dist, direction, pointSelSnapshot);
+        cccCopy.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(cccCopy, 1, compatibilityMode);
 
-    // copy at same offset position (in front of #ccc)
-    // Marks the boundary: slanted (black→grey) vs vertical (grey→#ccc)
-    var depthCopy = item.duplicate();
-    depthCopy = applyOffset(depthCopy, mode, dist, direction, pointSelSnapshot);
-    depthCopy.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(depthCopy, depth);
+        // copy at same offset position (in front of #ccc)
+        // Marks the boundary: slanted (black→grey) vs vertical (grey→#ccc)
+        var depthCopy = item.duplicate();
+        depthCopy = applyOffset(depthCopy, mode, dist, direction, pointSelSnapshot);
+        depthCopy.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(depthCopy, depth, compatibilityMode);
 
-    // Remove original
-    item.remove();
+        // Remove original
+        item.remove();
 
-    return grp;
+        return grp;
+    } catch (e) {
+        grp.remove();
+        throw e;
+    }
 }
 
 // ═══════════════════════════════════════════════
@@ -306,7 +312,7 @@ function buildBevel(doc, item, params, pointSelSnapshot) {
 //  params: [angle, angle2, chained, mode, thickness_mm, depth]
 // ═══════════════════════════════════════════════
 
-function buildSlider(doc, item, params, pointSelSnapshot) {
+function buildSlider(doc, item, params, pointSelSnapshot, compatibilityMode) {
     var angle = parseFloat(params[0]) || 45;
     var angle2 = parseFloat(params[1]) || 45;
     // params[2] = chained flag (UI only)
@@ -319,30 +325,35 @@ function buildSlider(doc, item, params, pointSelSnapshot) {
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
 
-    // Black copy at original position (front)
-    var blackCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
-    setDepth(blackCopy, 0)
+    try {
+        // Black copy at original position (front)
+        var blackCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
+        setDepth(blackCopy, 0, compatibilityMode)
 
-    // Grey copy — inset/outset/translated (middle)
-    const TO_RAD = Math.PI / 180
-    var off_unscaled = Math.sin(TO_RAD * angle) * Math.sin(TO_RAD * angle2) / Math.sin(TO_RAD * (180 - (angle + angle2)))
-    var off_px = off_unscaled * widthPt;
-    var off_mm = off_unscaled * thickness;
-    var line_depth_frac = (off_mm * Math.sin(TO_RAD * (90 - angle)) / Math.sin(TO_RAD * angle)) / thickness;
+        // Grey copy — inset/outset/translated (middle)
+        const TO_RAD = Math.PI / 180
+        var off_unscaled = Math.sin(TO_RAD * angle) * Math.sin(TO_RAD * angle2) / Math.sin(TO_RAD * (180 - (angle + angle2)))
+        var off_px = off_unscaled * widthPt;
+        var off_mm = off_unscaled * thickness;
+        var line_depth_frac = (off_mm * Math.sin(TO_RAD * (90 - angle)) / Math.sin(TO_RAD * angle)) / thickness;
 
-    var greyCopy = item.duplicate();
-    greyCopy = applyOffset(greyCopy, mode, off_px, direction, pointSelSnapshot);
-    greyCopy.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(greyCopy, line_depth_frac)
+        var greyCopy = item.duplicate();
+        greyCopy = applyOffset(greyCopy, mode, off_px, direction, pointSelSnapshot);
+        greyCopy.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(greyCopy, line_depth_frac, compatibilityMode)
 
-    // copy at original position (behind)
-    var originalLine = item.duplicate(grp, ElementPlacement.PLACEATEND);
-    setDepth(originalLine, 1)
+        // copy at original position (behind)
+        var originalLine = item.duplicate(grp, ElementPlacement.PLACEATEND);
+        setDepth(originalLine, 1, compatibilityMode)
 
-    // Remove original
-    item.remove();
+        // Remove original
+        item.remove();
 
-    return grp;
+        return grp;
+    } catch (e) {
+        grp.remove();
+        throw e;
+    }
 }
 
 // ═══════════════════════════════════════════════
@@ -359,7 +370,7 @@ function buildSlider(doc, item, params, pointSelSnapshot) {
 //    [2] black inward-offset copy (behind)
 // ═══════════════════════════════════════════════
 
-function buildGroove(doc, item, params, pointSelSnapshot) {
+function buildGroove(doc, item, params, pointSelSnapshot, compatibilityMode) {
     var angle1 = parseFloat(params[0]) || 45;
     var angle2 = parseFloat(params[1]) || 45;
     // params[2] = chained flag (UI only)
@@ -372,26 +383,31 @@ function buildGroove(doc, item, params, pointSelSnapshot) {
     var grp = doc.groupItems.add();
     grp.move(item, ElementPlacement.PLACEBEFORE);
 
-    // Black outward-offset copy (front)
-    var outCopy = item.duplicate();
-    outCopy = applyOffset(outCopy, "outward", outDist, null, pointSelSnapshot);
-    outCopy.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(outCopy, 0);
+    try {
+        // Black outward-offset copy (front)
+        var outCopy = item.duplicate();
+        outCopy = applyOffset(outCopy, "outward", outDist, null, pointSelSnapshot);
+        outCopy.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(outCopy, 0, compatibilityMode);
 
-    // Grey copy at original position (middle)
-    var greyCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
-    setDepth(greyCopy, depth);
+        // Grey copy at original position (middle)
+        var greyCopy = item.duplicate(grp, ElementPlacement.PLACEATEND);
+        setDepth(greyCopy, depth, compatibilityMode);
 
-    // Black inward-offset copy (behind)
-    var inCopy = item.duplicate();
-    inCopy = applyOffset(inCopy, "inward", inDist, null, pointSelSnapshot);
-    inCopy.move(grp, ElementPlacement.PLACEATEND);
-    setDepth(inCopy, 0);
+        // Black inward-offset copy (behind)
+        var inCopy = item.duplicate();
+        inCopy = applyOffset(inCopy, "inward", inDist, null, pointSelSnapshot);
+        inCopy.move(grp, ElementPlacement.PLACEATEND);
+        setDepth(inCopy, 0, compatibilityMode);
 
-    // Remove original
-    item.remove();
+        // Remove original
+        item.remove();
 
-    return grp;
+        return grp;
+    } catch (e) {
+        grp.remove();
+        throw e;
+    }
 }
 
 // ═══════════════════════════════════════════════
@@ -467,41 +483,17 @@ function recursiveUngroup(item) {
 }
 
 /**
- * Check if an item is a black line (stroked path/compound path with black stroke)
+ * A source edge is a stroked path, regardless of its color or color space.
  */
-function isBlackLine(item) {
-    try {
-        if (!item) return false;
-
-        if (item.typename === "PathItem") {
-            if (!item.stroked) return false;
-            var c = item.strokeColor;
-            if (c.typename === "RGBColor") {
-                return (c.red === 0 && c.green === 0 && c.blue === 0);
-            } else if (c.typename === "GrayColor") {
-                return (c.gray === 100);
-            } else if (c.typename === "CMYKColor") {
-                return (c.cyan === 0 && c.magenta === 0 && c.yellow === 0 && c.black === 100);
-            }
-            return false;
-        } else if (item.typename === "CompoundPathItem") {
-            if (!item.pathItems || item.pathItems.length === 0) return false;
-            var p = item.pathItems[0];
-            if (!p.stroked) return false;
-            var cc = p.strokeColor;
-            if (cc.typename === "RGBColor") {
-                return (cc.red === 0 && cc.green === 0 && cc.blue === 0);
-            } else if (cc.typename === "GrayColor") {
-                return (cc.gray === 100);
-            } else if (cc.typename === "CMYKColor") {
-                return (cc.cyan === 0 && cc.magenta === 0 && cc.yellow === 0 && cc.black === 100);
-            }
-            return false;
+function isStrokedPath(item) {
+    if (!item) return false;
+    if (item.typename === "PathItem") return item.stroked && !item.guides && !item.clipping;
+    if (item.typename === "CompoundPathItem") {
+        for (var i = 0; i < item.pathItems.length; i++) {
+            if (isStrokedPath(item.pathItems[i])) return true;
         }
-        return false;
-    } catch (e) {
-        return false;
     }
+    return false;
 }
 
 /**
@@ -534,11 +526,11 @@ function isOriginalLine(item) {
  * Helper: rebuild a joint from an original item, given type and params array.
  * pointSelSnapshot is an optional array of per-point selection states (from snapshotPointSelection).
  */
-function rebuildJoint(doc, item, type, params, pointSelSnapshot) {
-    if (type === "slant") return buildSlant(doc, item, params, pointSelSnapshot);
-    if (type === "bevel") return buildBevel(doc, item, params, pointSelSnapshot);
-    if (type === "slider") return buildSlider(doc, item, params, pointSelSnapshot);
-    if (type === "groove") return buildGroove(doc, item, params, pointSelSnapshot);
+function rebuildJoint(doc, item, type, params, pointSelSnapshot, compatibilityMode) {
+    if (type === "slant") return buildSlant(doc, item, params, pointSelSnapshot, compatibilityMode);
+    if (type === "bevel") return buildBevel(doc, item, params, pointSelSnapshot, compatibilityMode);
+    if (type === "slider") return buildSlider(doc, item, params, pointSelSnapshot, compatibilityMode);
+    if (type === "groove") return buildGroove(doc, item, params, pointSelSnapshot, compatibilityMode);
     return null;
 }
 
@@ -1042,31 +1034,44 @@ function deselectAll(doc) {
 /**
  * Recursively set all strokes to the given colour and remove fills.
  */
-function setAllStrokes(item, color) {
+function setAllStrokes(item, color, widthScale) {
+    if (widthScale === undefined) widthScale = 1;
     if (item.typename === "PathItem") {
-        if (item.stroked) item.strokeColor = color;
+        if (item.stroked) {
+            item.strokeColor = color;
+            item.strokeWidth *= widthScale;
+        }
         item.filled = false;
     } else if (item.typename === "CompoundPathItem") {
+        // Compound paths can share appearance: snapshot widths before changing any.
+        var widths = [];
+        for (var p = 0; p < item.pathItems.length; p++) widths.push(item.pathItems[p].strokeWidth);
         for (var i = 0; i < item.pathItems.length; i++) {
             if (item.pathItems[i].stroked) {
                 item.pathItems[i].strokeColor = color;
+                item.pathItems[i].strokeWidth = widths[i] * widthScale;
             }
             item.pathItems[i].filled = false;
         }
     } else if (item.typename === "GroupItem") {
         for (var j = 0; j < item.pageItems.length; j++) {
-            setAllStrokes(item.pageItems[j], color);
+            setAllStrokes(item.pageItems[j], color, widthScale);
         }
     }
 }
 
-function setDepth(item, depth_frac) {
-    setAllStrokes(item, makeColor(0, 0, 0));
-    setCSSClass(item, "depth-" + (depth_frac * 100).toFixed(3) + "%");
-    if (depth_frac > 0) {
-        var blurPx = depth_frac * 3.0;
-        applyBlur(item, blurPx);
+function setDepth(item, depth_frac, compatibilityMode) {
+    // SVG5DOF compatibility: darkness = 100% - 80% * depth.
+    // Default to compatibility mode even for callers without the new argument.
+    var compatible = compatibilityMode !== false;
+    setAllStrokes(item, compatible ? makeDepthColor(depth_frac) : makeColor(0, 0, 0),
+                  compatible ? 1 + depth_frac : 1);
+    if (!compatible && depth_frac > 0) {
+        applyBlur(item, depth_frac * 3.0);
     }
+    // Notes are internal metadata for revert/rebuild, not exported SVG classes.
+    setCSSClass(item, "depth-" + (depth_frac * 100).toFixed(3) + "%");
+    return item;
 }
 
 /**

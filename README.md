@@ -12,6 +12,16 @@ This enables unsigned CEP extensions and symlinks the project into Illustrator's
 
 Requires Illustrator CC 2020+ (CSXS 9.0).
 
+## Compatibility Mode
+
+**Compatibility Mode** is checked by default. Click **Apply** to create or rebuild selected joints with grayscale depth encoding instead of Illustrator's native Gaussian Blur live effect. Entry lines are black, exit lines are `#ccc`, and intermediate depths interpolate between them (50% depth is `#666`), following the [SVG5DOF specification](https://github.com/personal-5dof-laser-cutting/svg5dof/blob/main/specification.md#compatibility-mode).
+
+Stroke width also increases linearly with depth: entry lines keep the source width, 50% depth uses 1.5×, and exit lines (20% darkness) use 2×.
+
+Uncheck it before applying to use black strokes with the original width and Illustrator's native Gaussian Blur live effect. Changing the checkbox takes effect on the next Apply. Class-based SVG5DOF export is still a separate task.
+
+Profiles can be applied to stroked paths of any color, including compound paths. Unsupported artwork is skipped rather than deleted.
+
 ## Joint Types
 
 ### Straight (revert)

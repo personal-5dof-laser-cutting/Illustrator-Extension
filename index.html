@@ -236,7 +236,18 @@
         </div>
 
         <div id="status" class="spectrum-Body spectrum-Body--sizeXS status-bar"></div>
-        <button id="apply-btn" class="apply-btn" hidden>Apply</button>
+        <div class="panel-footer">
+            <button id="apply-btn" class="apply-btn" hidden>Apply</button>
+            <div class="compatibility-option">
+                <label class="compatibility-label">
+                    <input id="compatibility-mode" type="checkbox" aria-describedby="compatibility-tooltip" checked>
+                    Compatibility Mode
+                </label>
+                <div id="compatibility-tooltip" class="compatibility-tooltip" role="tooltip">
+                    Current versions of Illustrator do not handle blur well. This uses SVG5DOF in compatibility mode which encodes cutting depth for entry and exit line as grayscale instead.
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="js/CSInterface.js"></script>

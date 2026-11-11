@@ -39,12 +39,12 @@
                     <Menu>SVG5DOF</Menu>
                     <Geometry>
                         <Size>
-                            <Height>340</Height>
+                            <Height>440</Height>
                             <Width>280</Width>
                         </Size>
                         <MinSize>
-                            <Height>180</Height>
-                            <Width>220</Width>
+                            <Height>420</Height>
+                            <Width>280</Width>
                         </MinSize>
                     </Geometry>
                     <Icons />
